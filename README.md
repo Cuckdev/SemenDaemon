@@ -11,7 +11,6 @@ Welcome to SemenDaemon, an unofficial addon for Iwara, that aims to (mostly) rep
         <li><b>Reducing server load</b> - Because all of the searching happens fully locally on your PC (explained below), it places very little load* on the Iwara servers.</li>
     </ul>
 </p>
-<br>
 
 # How it works
 SemenDaemon is a userscript, which you can install in your browser by using a script manager like Greasemonkey, Tampermonkey, or Violentmoney and it then runs automatically when you visit Iwara's website. 
@@ -21,8 +20,12 @@ The only server traffic generated is when your browser loads the thumbnails and 
 # How to install
 It's very simple, download the SemenDeamon .js file and install it with your userscript manager of choice, I use Violentmonkey for example. After that go to Iwara, open SemenDaemon, read the Introduction page it shows you and import the database file, which you can also download here. Don't forget to unzip it first.
 
-# Screenshot
+# Screenshots
+Main window
 ![image](https://github.com/user-attachments/assets/ba092004-bb53-4a78-916b-3a51197cd32d)
+
+Filter guide
+![image](https://github.com/user-attachments/assets/ee60248a-a3f4-4499-a84c-a46f55d1f32a)
 
 
 <p><b>SemenDaemon is in no way associated with Iwara in any official capacity.</b></p>
