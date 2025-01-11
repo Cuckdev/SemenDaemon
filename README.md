@@ -13,7 +13,7 @@ Welcome to SemenDaemon, an unofficial addon for Iwara, that aims to (mostly) rep
 </p>
 
 # How it works
-SemenDaemon is a userscript, which you can install in your browser by using a script manager like Greasemonkey, Tampermonkey, or Violentmoney and it then runs automatically when you visit Iwara's website. 
+SemenDaemon is a userscript, which you can install in your browser, by using a script manager like Greasemonkey, Tampermonkey, or Violentmoney and then it runs automatically, when you visit Iwara's website. 
 SemenDaemon uses a local content database stored on your computer, and thanks to that all searching and filtering happens fully offline, with no internet needed, and is thus near instanteneous. 
 The only server traffic generated is when your browser loads the thumbnails and profile pictures in search results or if you perform a database update.
 
