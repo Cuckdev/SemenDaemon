@@ -21,7 +21,10 @@ The only server traffic generated is when your browser loads the thumbnails and 
 There are some tradeoffs in exchange for the speed you will be getting. Due to the fact that SemenDaemon works with an offline database, the existing entries in the database will not be kept up-to-date, this means that if the uploader changes the title of the video, or the number of likes goes up over time, these changes will not be reflected in the offline database. However, SemenDaemon has the ability to fetch new videos which do not yet exist in its database to keep its catalog up to date (it's just that any further changes to those videos that already exist in the database will not be recorded).
 
 # How to install
-It's very simple, download the SemenDeamon .js file and install it with your userscript manager of choice, I use Violentmonkey for example. After that go to Iwara, open SemenDaemon, read the Introduction page it shows you and import the database file, which you can also download here. Don't forget to unzip it first.
+It's very simple, download the SemenDeamon .js file and install it with your userscript manager of choice, I use Violentmonkey for example. After that go to Iwara, open SemenDaemon, read the Introduction page it shows you and import the database file, which you can also download from a link below. Don't forget to unzip it first.
+Database file download links (2025-01-11) (file is too big to fit on github)
+https://files.catbox.moe/woc1sl.zip
+https://mega.nz/file/A04zzYaT#lVA5yRX3Q88HKMd7FhlB6wLnknzdpC148oOm1c1lbIQ
 
 # Screenshots
 Main window
