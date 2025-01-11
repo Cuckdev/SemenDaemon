@@ -8,7 +8,7 @@ Welcome to SemenDaemon, an unofficial addon for Iwara, that aims to (mostly) rep
         <li><b>Extensive filtering</b> - You can sort and filter the search results by likes, views, duration, artists, characters, general tags or any combination of them.</li>
         <li><b>Filter favorites</b> - You can store your favorite filter settings as favorites and then apply them with a single click</li>
         <li><b>Improved tagging</b> - SemenDaemon combines tagging from other sites where these videos exist, so even if the video has no tags on Iwara, it might still have tags in SemenDaemon's database, allowing you to find videos, which you could never find via Iwara's search.</li>
-        <li><b>Reducing server load</b> - Because all of the searching happens fully locally on your PC (explained below), it places very little load* on the Iwara servers.</li>
+        <li><b>Reducing server load</b> - Because all of the searching happens fully locally on your PC (explained below), it generates much less server traffic.</li>
     </ul>
 </p>
 
