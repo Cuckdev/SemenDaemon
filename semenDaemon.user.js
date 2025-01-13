@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SemenDaemon
 // @namespace    cuckIndustries
-// @version      v1.1
+// @version      v1.11
 // @description  Video search tool for iwara.tv
 // @author       Cuckdev
 // @match        https://www.iwara.tv/*
@@ -15,7 +15,7 @@
 // For DEV loader script method, since GM object is not available in the injected script
 if(!GM)
 {
-    var GM = {'info': {'script': {'version': 1.1}}}
+    var GM = {'info': {'script': {'version': 1.11}}}
 }
 
 (function() {
@@ -111,11 +111,12 @@ if(!GM)
                     <div class="thumbnail"><img src="${videoThumbnailUrl}" loading="lazy"></div>    
                     <div class="title">${videoData.title}</div>                
                     <div class="pfp"><img src="${avatarUrl}" loading="lazy"></div> 
-                                    <div class="uploader" title="${videoData.uploader}">${videoData.uploaderDisplayName}</div>
+                                    <div class="uploader" title="${videoData.uploader}" style="cursor: pointer">${videoData.uploaderDisplayName}</div>
                                     <div class="uploaded">${localizedUploadDateString.replace(/, ([0-9]{1,2}:[0-9]{1,2}):[0-9]{1,2}/i, '')} <span style="float:right; font-weight: bold">${SecondsToTimestamp(videoData.duration)}</span></div>
                                     <div class="metrics">❤️${FormatNumber(videoData.likes)}&nbsp;&nbsp;&nbsp;👁️${FormatNumber(videoData.views)}</div>        
             `;        
             
+            videoTileElement.querySelector(".uploader").addEventListener('click', e => window.open('https://www.iwara.tv/profile/' + videoData.uploader));
 
             // Support for old video previews
             // Older videos don't have animated preview.webp, but instead scrub through pregenerated thumbnail list. If preview.webp fails to load, it means the video likely uses the old preview type, so we mark this video for the thumbnail cycler function which will simulate the video preview
@@ -566,6 +567,7 @@ if(!GM)
             <li>Favorites are now sorted by using the sort field</li>
             <li>SemenDaemon window can be toggled by clicking on the menu link (or by Alt + S hotkey)</li>
             <li>Chained OR search filtering is now supported, see filter guide page for details</li>
+            <li>Reversed sorting order is now supported with sort<:likes </li>
             <li>Database data are now only loaded when SemenDaemon is first opened, in order to optimize RAM usage</li>
             <li>Database updater now triggers itself automatically</li>        
         </ul></p>
@@ -819,7 +821,10 @@ if(!GM)
         let queryText = e.target.value;
         // Sorting is per whole query, not per segment like the rest of filters, so pull it here, before the segmentation happens
         let sorting = queryText.match(/s(?:ort)?(?<ascending><)?:(?<sortType>[a-z](?:[a-z]{2,10})?)/ui);    
-        queryText = queryText.replaceAll(sorting[0], '');          
+
+        if(sorting)
+            queryText = queryText.replaceAll(sorting[0], '');          
+
         let orSegments = queryText.split('||');
         let filteredVideosListCombined = [];             
         
