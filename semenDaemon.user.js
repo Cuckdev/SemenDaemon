@@ -1,19 +1,27 @@
 // ==UserScript==
 // @name         SemenDaemon
 // @namespace    cuckIndustries
-// @version      v1.0
+// @version      v1.1
 // @description  Video search tool for iwara.tv
 // @author       Cuckdev
 // @match        https://www.iwara.tv/*
+// @grant        GM.info
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=iwara.tv
 // @downloadURL  https://raw.githubusercontent.com/Cuckdev/SemenDaemon/refs/heads/main/semenDaemon.user.js
 // @updateURL    https://raw.githubusercontent.com/Cuckdev/SemenDaemon/refs/heads/main/semenDaemon.user.js
+
 // ==/UserScript==
+
+// For DEV loader script method, since GM object is not available in the injected script
+if(!GM)
+{
+    var GM = {'info': {'script': {'version': 1.1}}}
+}
 
 (function() {
     'use strict';
     var videosList = []    
-    const MaxSearchResults = 500;
+    const MaxSearchResults = 1000;
     const apiAccessToken = localStorage.getItem("token")
     const semenDaemonContainerElement = document.createElement('div');
     semenDaemonContainerElement.id = "semenDaemonContainer";    
@@ -151,16 +159,56 @@
         let filterContainerElement = semenDaemonContainerElement.querySelector(".favoriteFilters");
         filterContainerElement.innerHTML = "";
 
+        Config.data.favoriteFilters.sort((a, b) => a.sorting - b.sorting);
         Config.data.favoriteFilters.forEach(filterData => {
             let spanElement = document.createElement('span');
             spanElement.setAttribute("data-query", filterData.query);
             spanElement.innerHTML = filterData.name;
-
+            spanElement.SD_filterData = filterData;
+            
             if(filterData.color)
                 spanElement.style.backgroundColor = filterData.color;
 
+            // Delete filter
+            spanElement.addEventListener('contextmenu', e => {
+                
+                if(!e.altKey) 
+                    return;
+
+                Config.data.favoriteFilters = Config.data.favoriteFilters.filter(f => f !== filterData); // Delete this filter object from the filter list
+                Config.SaveConfig();
+                RenderFilterFavorites();                                
+            })
+            
+            spanElement.addEventListener('click', e => {
+                
+                if(e.altKey) // We are editing the filter instead
+                {
+                    Config.data.favoriteFilters = Config.data.favoriteFilters.filter(f => f !== filterData); // Delete the filter before we edit, so it then just gets re-added as a new filter making it look like an edit. If the edit is not finished, the filter array won't get saved so the deletion won't get applied, so it  can't be accidentaly deleted.
+                    document.querySelector("#addNewFilterFavoritePage").style.display = 'block';
+                    semenDaemonContainerElement.querySelector('#favoriteFilter_name').value = filterData.name;
+                    semenDaemonContainerElement.querySelector('#favoriteFilter_query').value = filterData.query;
+                    semenDaemonContainerElement.querySelector('#favoriteFilter_color').value = filterData.color;
+                    semenDaemonContainerElement.querySelector('#favoriteFilter_sorting').value = filterData.sorting;                    
+                    return;
+                }
+
+                queryFieldElement.value = e.target.dataset.query;        
+                // Fake enter press on the search field after putting filter query in, so it executes
+                queryFieldElement.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: 'Enter',       // The value of the key pressed
+                    code: 'Enter',      // The physical key on the keyboard
+                    keyCode: 13,        // Legacy property for "Enter" key
+                    charCode: 13,       // Legacy property for "Enter" key
+                    bubbles: true,      // Allow the event to bubble up
+                    cancelable: true,   // Allow the event to be canceled
+                }));
+            })
+
             filterContainerElement.appendChild(spanElement);
         });
+
+        
     }
 
 /*############### Create menu button #################*/
@@ -187,13 +235,33 @@
         clone.querySelector('a div.text').innerHTML = "SemenDaemon"        
         clone.querySelector("svg").replaceWith(menuIconElement)
         clone.addEventListener('click', (e) => {
-                semenDaemonContainerElement.style.display = "block";
+            
+                // Triggered if we are freshly updated the script and coming from an older version possilby
+                if(Config.data.version < parseFloat(GM.info.script.version)) // If this is the first time using this addon, show the introduction
+                {            
+                    semenDaemonContainerElement.querySelector('#changelogContainer').style.display = 'block';
+                    Config.data.version = parseFloat(GM.info.script.version);
+                    Config.SaveConfig();
+                }
+
+                if(videosList.length == 0) // Load the database only when we frist open SD, to save RAM, specially if iwara is open in multiple tabs                
+                    TryLoadDatabase();
+                                    
+
+                semenDaemonContainerElement.style.display = (semenDaemonContainerElement.style.display == 'block' ? 'none' : 'block');
                 queryFieldElement.focus();
                 e.preventDefault(); 
                 e.stopImmediatePropagation()
             }, false)
 
         menuElement.parentNode.insertBefore(clone, menuElement.nextElementSibling);
+
+        let updateIconElement = document.createElement('span');
+        updateIconElement.id = "dbUpdateMenuIcon";
+        updateIconElement.innerHTML = "⬇️";
+        updateIconElement.style = "position: absolute; left: -20px; top: -5px; display: none";        
+        menuIconElement.parentNode.appendChild(updateIconElement);
+        dbUpdateMenuIconElement = updateIconElement;
     }
 
     // Give the page some time to load and then generate the menu button. Then regenerate it every time iwara script re-renders the menu
@@ -435,7 +503,7 @@
                 color: #2993e9
             }
 
-            #semenDaemonContainer input[type=text]
+            #semenDaemonContainer input[type=text], #semenDaemonContainer input[type=number]
             {                
                 background-color: #1f2228;
                 color: white;
@@ -480,12 +548,30 @@
         <div id="addNewFilterFavoritePage" class="semenDaemonPage">
             <label for="favoriteFilter_name">Name:</label><input type="text" id="favoriteFilter_name"><br>
             <label for="favoriteFilter_query">Query:</label><input type="text" id="favoriteFilter_query"><br>
-            <label for="favoriteFilter_color">Color:</label><input type="text" placeholder="#282c34" id="favoriteFilter_color"><br><br>
+            <label for="favoriteFilter_color">Color:</label><input type="text" placeholder="#282c34" id="favoriteFilter_color" title="Background color to use for this filter button"><br>
+            <label for="favoriteFilter_sorting">Sorting:</label><input type="number" id="favoriteFilter_sorting" value="1" title="Filter buttons are sorted by this, so if you set this to 1 and other filters to 2, this one will be displayed first"><br><br>
             <input type="button" value="Add filter">
         </div>    
         
 
     `;
+
+/*############### CHANGELOG PAGE HTML #################*/
+    semenDaemonContainerElement.innerHTML += /*html*/`  
+    <div id="changelogContainer" class="semenDaemonPage">
+        <div class="closePage">❌</div>
+        <h2 style="margin: 0px 0 10px 0">Changelog v1.1</h2>        
+        <p><ul>
+            <li>Favorites can now be edited with Alt + Click and deleted with Alt + Right click</li>
+            <li>Favorites are now sorted by using the sort field</li>
+            <li>SemenDaemon window can be toggled by clicking on the menu link (or by Alt + S hotkey)</li>
+            <li>Chained OR search filtering is now supported, see filter guide page for details</li>
+            <li>Database data are now only loaded when SemenDaemon is first opened, in order to optimize RAM usage</li>
+            <li>Database updater now triggers itself automatically</li>        
+        </ul></p>
+    </div>
+    `;
+
 /*############### CONFIG PAGE HTML #################*/
     semenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="configContainer" class="semenDaemonPage">
@@ -499,6 +585,7 @@
         <p>This will connect to iwara servers and fetch content catalog pages until the offline database file is fully up to date. 
             Note that if you have active blacklist(on Iwara), or you aren't logged in, then the fetched videos won't include any of thoe blacklisted videos, as Iwara won't serve them. </p>
         <p>Depending on how old your database is, this might take anywhere from few seconds to several minutes. If you close the tab, or go to a different page while the update is happening, all progress will be lost.</p>
+        <p>Every time you open SD, if enough time has passed, it will trigger auto database update. Running update is indicated by this iocn: ⬇️ displayed next to SD menu icon. Do NOT close the tab while this icon is displayed or the auto update will fail. If it does fail, you have to trigger manual update here, in order to make auto updates work again. Using SD in other tabs while the update is running in one is fine.</p>
         <h3 style="margin: 10px 0 10px 0">Import / Export data</h3>
         <p>Please note that when importing or exporting the content database file, depending on how much of a potato your PC is, it might take a while (from seconds to few minutes) and the browser window might appear frozen during it.</p>
         <label for="filePicker_db" style="cursor: pointer">[ <a>Import Iwara Database file</a> ]</label><input type="file" accept=".json" id="filePicker_db" >  
@@ -544,7 +631,8 @@
         <p>
             <ul>
                 <li><span class="argName">Alt + S</span> - Open search window</li>                
-                <li><span class="argName">Alt + Click</span> - <i>On a favorite filter</i> - Remove favorite filter</li>                
+                <li><span class="argName">Alt + Click</span> - <i>On a favorite filter</i> - Edit favorite filter</li>                
+                <li><span class="argName">Alt + Right click</span> - <i>On a favorite filter</i> - Delete favorite filter</li>                
                 <li><span class="argName">Alt + Click</span> - <i>On a video</i> - Open video on Oreno instead of Iwara, if we have oreno ID for that video.</li>               
             </ul>
         </p>
@@ -557,7 +645,7 @@
     </div>
     `;
 
-/*############### SEARCH HOW TO PAGE HTML #################*/
+/*############### SEARCH HOW-TO PAGE HTML #################*/
     semenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="searchHowto", class="semenDaemonPage">        
         <div class="closePage">❌</div>
@@ -572,10 +660,12 @@
             <li><i><span class="argName">character:</span>character1,character_2</i> - Listed characters must match ONE of these. (can be shortened to c:character)</li>
             <li><i><span class="argName">character&:</span>character1,character_2</i> - All listed characters must be present in character tags (can be shortened to c&:character)</li>
             <li><i><span class="argName">sort:</span>views | likes | artist | date | duration | comments</i> - Sort the results by one of these</li>
+            <li><i><span class="argName">sort<:</span>views | likes | artist | date | duration | comments</i> - Sort the results by one of these in asceding order</li>
             <li><i><span class="argName">s:</span>v | l | a | d | u | c</i> - Same as above, but shorter to write</li>
             <li><i><span class="argName">likes | views | duration ></span>NUBMER</i> - Must have more than given amount of likes, views, or be longer than given amount of seconds (you can also use less than <)</li>
             <li><i><span class="argName">l | v | d ></span>NUMBER</i> - Same as above, but shorter to write</li>
             <li><i><span class="argName">oreno:</span>off</i> - Do not use oreno common tag library during tag searches</li>
+            <li><i>search query 1 <span class="argName">||</span> search query 2</i> - Combine results from seveal search queries</li>
         </ul>
         <p>You can combine these filters in any way you like.<br> Searches are case insensitive.<br> Filters cannot have spaces in them, you can write "artist name" as "artist_name".<br>You cannot use same type of filter more than once, for example +tag1,tag2 +tag3,tag4.</p>
         <h3 style="margin: 0px 0 10px 0">Examples</h3> 
@@ -594,17 +684,23 @@
 
         <p><b>Fap hero +mmd,blender -&insect,spider views>1000 likes<5000 duration>60 sort:duration</b><br>
         <i>Finds all videos which contain Fap hero in their title, have either mmd or blender tag, don't have BOTH insect AND spider tag, have more than 1000 views, less than 5000 likes, are longer than 60 seconds and sorts them by video length.</i></p>
+
+        <p><b>+strip,dance +mmd likes>200 || hmv -koikatsu views>10000 sort:views</b><br>
+        <i>Runs first query at the left side of ||, then the second query at the right side, then combines both result pools and sorts them. You can have as many || (aka OR) segments as you want. Important: Sorting is applied for the entire query, not per segment, this means that only one sort:.. notation can be used for the whole query.</i></p>
+
     </div>
     `;
 /*############### ELEMENT VARS FOR THE IMPORTANT PAGE ELEMENTS #################*/
     // Note this must be done after we amended all the HTML stuff to the page
-    const queryFieldElement = semenDaemonContainerElement.querySelector('#searchQuery');
+    const queryFieldElement = semenDaemonContainerElement.querySelector('#searchQuery');    
     const searchResultsContainerElement = semenDaemonContainerElement.querySelector('#searchResults');
     const searchQueryPlaceholders = ["What is your coomer query?", "What are we edging to today?", "Fap time!", "Switching to your side arm is faster than reloading", "Bobs or vegana, whichever will it be?", "Ara ara..."];    
     const blacklistElement = semenDaemonContainerElement.querySelector("#blacklist")    
+    var dbUpdateMenuIconElement;
 
     document.body.appendChild(semenDaemonContainerElement);
 
+    
     
 /*############### HTML GUI LOGIC STUFF #################*/    
     semenDaemonContainerElement.querySelectorAll(".openWindow").forEach(element => element.addEventListener("click", e => semenDaemonContainerElement.querySelector('#' + e.target.dataset.page).style.display = "block"));
@@ -614,28 +710,6 @@
         Config.SaveConfig();
     })    
 
-    semenDaemonContainerElement.querySelector(".favoriteFilters").addEventListener("click", e => 
-        {
-            if(e.altKey) // If alt is pressed, delete the favorite
-            {
-                Config.data.favoriteFilters = Config.data.favoriteFilters.filter(f => f.query != e.target.dataset.query);
-                Config.SaveConfig();
-                RenderFilterFavorites();
-                return;
-            }
-
-            queryFieldElement.value = e.target.dataset.query;        
-            // Fake enter press on the search field after putting filter query in so it executes
-            queryFieldElement.dispatchEvent(new KeyboardEvent('keydown', {
-                key: 'Enter',       // The value of the key pressed
-                code: 'Enter',      // The physical key on the keyboard
-                keyCode: 13,        // Legacy property for "Enter" key
-                charCode: 13,       // Legacy property for "Enter" key
-                bubbles: true,      // Allow the event to bubble up
-                cancelable: true,   // Allow the event to be canceled
-            }));
-        })
-
     // Prefill the favorite filter form query field
     semenDaemonContainerElement.querySelector(".addFavoriteFilter").addEventListener("click", e => 
         {
@@ -643,13 +717,14 @@
             semenDaemonContainerElement.querySelector('#favoriteFilter_name').focus();
         });
 
+    // Add new filter
     semenDaemonContainerElement.querySelector("#addNewFilterFavoritePage input[type=button]").addEventListener("click", e => 
         {
             let favoriteFilter = {
                 name: semenDaemonContainerElement.querySelector('#favoriteFilter_name').value,
                 query: semenDaemonContainerElement.querySelector('#favoriteFilter_query').value,
                 color: semenDaemonContainerElement.querySelector('#favoriteFilter_color').value,
-                sorting: 0
+                sorting: semenDaemonContainerElement.querySelector('#favoriteFilter_sorting').value,
             };
 
             if(favoriteFilter.name && favoriteFilter.query)
@@ -723,7 +798,7 @@
     // Makes callable function on strings via stringvar.adjustForFiltering() and preps the string to be used for filter comparison
     String.prototype.adjustForFiltering = function ()
     {                
-        return this.toLowerCase().replaceAll(' ', '_'); // Example: Convert the string to uppercase
+        return this.toLowerCase().replaceAll(' ', '_'); 
     };
 
 
@@ -741,231 +816,253 @@
             OrenoCharacter: 4
         }
 
-        let filteredVideosList = [];
         let queryText = e.target.value;
-        let likesFilter = queryText.match(/l(?:ikes)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
-        let viewsFilter = queryText.match(/v(?:iews)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
-        let durationFilter = queryText.match(/d(?:uration)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
-        let usersFilter = queryText.match(/u(?:ser)?(?<blacklist>-)?:(?<userList>[^\s]+)/ui);
-        let charactersFilter = queryText.match(/c(?:haracter)?(?<all>&)?:(?<characterList>[^\s]+)/ui);
-        let tagsFilterWhite = queryText.match(/\+(?<all>&)?(?<tagList>[^\s]+)/ui);
-        let tagsFilterBlack = queryText.match(/-(?<all>&)?(?<tagList>[^\s]+)/ui); // \p{L} natch all unicode letters
-        let sorting = queryText.match(/s(?:ort)?:(?<sortType>[a-z](?:[a-z]{2,10})?)/ui);        
-        let orenoTagsSwitch = queryText.match(/oreno:(?<state>on|off)/ui);
-
-        let tagCategoriesToUse = (orenoTagsSwitch?.groups.state == 'off') ? TagCategories.IwaraGeneral : TagCategories.All;
-
-        filteredVideosList = videosList;
+        // Sorting is per whole query, not per segment like the rest of filters, so pull it here, before the segmentation happens
+        let sorting = queryText.match(/s(?:ort)?(?<ascending><)?:(?<sortType>[a-z](?:[a-z]{2,10})?)/ui);    
+        queryText = queryText.replaceAll(sorting[0], '');          
+        let orSegments = queryText.split('||');
+        let filteredVideosListCombined = [];             
         
-        if(likesFilter)
-        {
-            queryText = queryText.replaceAll(likesFilter[0], '');
+        // Run filtering on each segment and then join the results at the end, which will give us the OR filtering
+        orSegments.forEach(queryText => 
+        {                          
+            let filteredVideosList = [];      
+            let likesFilter = queryText.match(/l(?:ikes)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
+            let viewsFilter = queryText.match(/v(?:iews)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
+            let durationFilter = queryText.match(/d(?:uration)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
+            let usersFilter = queryText.match(/u(?:ser)?(?<blacklist>-)?:(?<userList>[^\s]+)/ui);
+            let charactersFilter = queryText.match(/c(?:haracter)?(?<all>&)?:(?<characterList>[^\s]+)/ui);
+            let tagsFilterWhite = queryText.match(/\+(?<all>&)?(?<tagList>[^\s]+)/ui);
+            let tagsFilterBlack = queryText.match(/-(?<all>&)?(?<tagList>[^\s]+)/ui); // \p{L} natch all unicode letters             
+            let orenoTagsSwitch = queryText.match(/oreno:(?<state>on|off)/ui);
 
-            filteredVideosList = filteredVideosList.filter((videoData)=>
-                {
-                    switch(likesFilter.groups.operator)
-                    {
-                        case '=':
-                        case '==':
-                            return videoData.likes == parseInt(likesFilter.groups.amount);
-                            break
+            let tagCategoriesToUse = (orenoTagsSwitch?.groups.state == 'off') ? TagCategories.IwaraGeneral : TagCategories.All;
 
-                        case '>':
-                        case '>=':
-                                return videoData.likes >= parseInt(likesFilter.groups.amount);
-                                break
-
-                        case '<':
-                        case '<=':
-                                    return videoData.likes <= parseInt(likesFilter.groups.amount);
-                                    break
-
-                        default:
-                            return false;
-                    }
-                }); 
-                
-        }
-
-        if(viewsFilter)
-        {
-            queryText = queryText.replaceAll(viewsFilter[0], '');
-
-            filteredVideosList = filteredVideosList.filter((videoData)=>
-                {
-                    switch(viewsFilter.groups.operator)
-                    {
-                        case '=':
-                        case '==':
-                            return videoData.views == parseInt(viewsFilter.groups.amount);
-                            break
-
-                        case '>':
-                        case '>=':
-                                return videoData.views >= parseInt(viewsFilter.groups.amount);
-                                break
-
-                        case '<':
-                        case '<=':
-                                    return videoData.views <= parseInt(viewsFilter.groups.amount);
-                                    break
-
-                        default:
-                            return false;
-                    }
-                }); 
-        }
-
-        if(durationFilter)
+            filteredVideosList = videosList;
+            
+            if(likesFilter)
             {
-                queryText = queryText.replaceAll(durationFilter[0], '');
+                queryText = queryText.replaceAll(likesFilter[0], '');
 
                 filteredVideosList = filteredVideosList.filter((videoData)=>
                     {
-                        switch(durationFilter.groups.operator)
+                        switch(likesFilter.groups.operator)
                         {
                             case '=':
                             case '==':
-                                return videoData.duration == parseInt(durationFilter.groups.amount);
+                                return videoData.likes == parseInt(likesFilter.groups.amount);
                                 break
-    
+
                             case '>':
                             case '>=':
-                                    return videoData.duration >= parseInt(durationFilter.groups.amount);
+                                    return videoData.likes >= parseInt(likesFilter.groups.amount);
                                     break
-    
+
                             case '<':
                             case '<=':
-                                    return videoData.duration <= parseInt(durationFilter.groups.amount);
+                                        return videoData.likes <= parseInt(likesFilter.groups.amount);
+                                        break
+
+                            default:
+                                return false;
+                        }
+                    }); 
+                    
+            }
+
+            if(viewsFilter)
+            {
+                queryText = queryText.replaceAll(viewsFilter[0], '');
+
+                filteredVideosList = filteredVideosList.filter((videoData)=>
+                    {
+                        switch(viewsFilter.groups.operator)
+                        {
+                            case '=':
+                            case '==':
+                                return videoData.views == parseInt(viewsFilter.groups.amount);
+                                break
+
+                            case '>':
+                            case '>=':
+                                    return videoData.views >= parseInt(viewsFilter.groups.amount);
                                     break
-    
+
+                            case '<':
+                            case '<=':
+                                        return videoData.views <= parseInt(viewsFilter.groups.amount);
+                                        break
+
                             default:
                                 return false;
                         }
                     }); 
             }
-    
+
+            if(durationFilter)
+                {
+                    queryText = queryText.replaceAll(durationFilter[0], '');
+
+                    filteredVideosList = filteredVideosList.filter((videoData)=>
+                        {
+                            switch(durationFilter.groups.operator)
+                            {
+                                case '=':
+                                case '==':
+                                    return videoData.duration == parseInt(durationFilter.groups.amount);
+                                    break
         
-        if(usersFilter && !usersFilter.groups.blacklist) // Filter by user (aka uploader, aka artist), uploader has to match at least one of the given names
-        {
-            queryText = queryText.replaceAll(usersFilter[0], '');
-            let userList = usersFilter.groups.userList.adjustForFiltering().split(','); // Make user name lower case, so the search is case insensitive
-            console.log(userList)
-            filteredVideosList = filteredVideosList.filter((videoData) => 
-                {
-                    return userList.includes(videoData.uploader.adjustForFiltering()) || userList.includes(videoData.uploaderDisplayName.adjustForFiltering())
-                });
-        }
-
-        if(usersFilter && usersFilter.groups.blacklist) // Filter by user (aka uploader, aka artist), uploader has to match NONE of the given names
-        {
-            queryText = queryText.replaceAll(usersFilter[0], '');
-            let userList = usersFilter.groups.userList.adjustForFiltering().split(','); // Make user name lower case, so the search is case insensitive
+                                case '>':
+                                case '>=':
+                                        return videoData.duration >= parseInt(durationFilter.groups.amount);
+                                        break
+        
+                                case '<':
+                                case '<=':
+                                        return videoData.duration <= parseInt(durationFilter.groups.amount);
+                                        break
+        
+                                default:
+                                    return false;
+                            }
+                        }); 
+                }
+        
             
-            filteredVideosList = filteredVideosList.filter((videoData) => 
-                {
-                    return !userList.includes(videoData.uploader.adjustForFiltering()) && !userList.includes(videoData.uploaderDisplayName.adjustForFiltering())
-                });
-        }
-
-        if(tagsFilterWhite && !tagsFilterWhite.groups.all) // At least one tag in list must match
+            if(usersFilter && !usersFilter.groups.blacklist) // Filter by user (aka uploader, aka artist), uploader has to match at least one of the given names
             {
+                queryText = queryText.replaceAll(usersFilter[0], '');
+                let userList = usersFilter.groups.userList.adjustForFiltering().split(','); // Make user name lower case, so the search is case insensitive
+                
+                filteredVideosList = filteredVideosList.filter((videoData) => 
+                    {
+                        return userList.includes(videoData.uploader.adjustForFiltering()) || userList.includes(videoData.uploaderDisplayName.adjustForFiltering())
+                    });
+            }
+
+            if(usersFilter && usersFilter.groups.blacklist) // Filter by user (aka uploader, aka artist), uploader has to match NONE of the given names
+            {
+                queryText = queryText.replaceAll(usersFilter[0], '');
+                let userList = usersFilter.groups.userList.adjustForFiltering().split(','); // Make user name lower case, so the search is case insensitive
+                
+                filteredVideosList = filteredVideosList.filter((videoData) => 
+                    {
+                        return !userList.includes(videoData.uploader.adjustForFiltering()) && !userList.includes(videoData.uploaderDisplayName.adjustForFiltering())
+                    });
+            }
+
+            if(tagsFilterWhite && !tagsFilterWhite.groups.all) // At least one tag in list must match
+                {
+                    queryText = queryText.replaceAll(tagsFilterWhite[0], '');
+                    let tagsList = tagsFilterWhite.groups.tagList.adjustForFiltering().split(','); 
+                    
+
+                    filteredVideosList = filteredVideosList.filter(videoData => 
+                        tagsList.some(videoTag => 
+                            (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
+                            (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
+                        )
+                    );
+                }
+
+            if(tagsFilterWhite && tagsFilterWhite.groups.all) // All tags in list much match
+            {            
                 queryText = queryText.replaceAll(tagsFilterWhite[0], '');
                 let tagsList = tagsFilterWhite.groups.tagList.adjustForFiltering().split(','); 
-                
-
                 filteredVideosList = filteredVideosList.filter(videoData => 
-                    tagsList.some(videoTag => 
+                    tagsList.every(videoTag => 
                         (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
                         (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
                     )
                 );
             }
 
-        if(tagsFilterWhite && tagsFilterWhite.groups.all) // All tags in list much match
-        {            
-            queryText = queryText.replaceAll(tagsFilterWhite[0], '');
-            let tagsList = tagsFilterWhite.groups.tagList.adjustForFiltering().split(','); 
-            filteredVideosList = filteredVideosList.filter(videoData => 
-                tagsList.every(videoTag => 
-                    (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
-                    (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
-                )
-            );
-        }
+            if(tagsFilterBlack && !tagsFilterBlack.groups.all) // Video tags must NOT contain any  of these tags
+            {
+                queryText = queryText.replaceAll(tagsFilterBlack[0], '');
+                let tagsList = tagsFilterBlack.groups.tagList.adjustForFiltering().split(','); 
+                filteredVideosList = filteredVideosList.filter(videoData => 
+                    !tagsList.some(videoTag => 
+                        (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
+                        (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
+                    )
+                );
+            }
 
-        if(tagsFilterBlack && !tagsFilterBlack.groups.all) // Video tags must NOT contain any  of these tags
-        {
-            queryText = queryText.replaceAll(tagsFilterBlack[0], '');
-            let tagsList = tagsFilterBlack.groups.tagList.adjustForFiltering().split(','); 
-            filteredVideosList = filteredVideosList.filter(videoData => 
-                !tagsList.some(videoTag => 
-                    (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
-                    (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
-                )
-            );
-        }
-
-        if(tagsFilterBlack && tagsFilterBlack.groups.all) // Video tags must NOT contain ALL  of these tags
-        {
-            queryText = queryText.replaceAll(tagsFilterBlack[0], '');
-            let tagsList = tagsFilterBlack.groups.tagList.adjustForFiltering().split(','); 
-            filteredVideosList = filteredVideosList.filter(videoData => 
-                !tagsList.every(videoTag => 
-                    (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
-                    (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
-                )
-            );;
-        }
-        
-        if(charactersFilter && !charactersFilter.groups.all) // At least one character in list must match
-        {
-            queryText = queryText.replaceAll(charactersFilter[0], '');
-            let tagsList = charactersFilter.groups.characterList.adjustForFiltering().split(','); 
+            if(tagsFilterBlack && tagsFilterBlack.groups.all) // Video tags must NOT contain ALL  of these tags
+            {
+                queryText = queryText.replaceAll(tagsFilterBlack[0], '');
+                let tagsList = tagsFilterBlack.groups.tagList.adjustForFiltering().split(','); 
+                filteredVideosList = filteredVideosList.filter(videoData => 
+                    !tagsList.every(videoTag => 
+                        (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
+                        (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
+                    )
+                );;
+            }
             
+            if(charactersFilter && !charactersFilter.groups.all) // At least one character in list must match
+            {
+                queryText = queryText.replaceAll(charactersFilter[0], '');
+                let tagsList = charactersFilter.groups.characterList.adjustForFiltering().split(','); 
+                
 
-            filteredVideosList = filteredVideosList.filter(videoData => 
-                tagsList.some(videoTag => 
-                    videoData.tags.orenoCharacterTags.some(charTag => videoTag.adjustForFiltering() === charTag.adjustForFiltering())                   
-                )
-            );
-        }
+                filteredVideosList = filteredVideosList.filter(videoData => 
+                    tagsList.some(videoTag => 
+                        videoData.tags.orenoCharacterTags.some(charTag => videoTag.adjustForFiltering() === charTag.adjustForFiltering())                   
+                    )
+                );
+            }
 
-        if(charactersFilter && charactersFilter.groups.all) // All characters in list must match
-        {            
-            queryText = queryText.replaceAll(charactersFilter[0], '');
-            let tagsList = charactersFilter.groups.characterList.adjustForFiltering().split(','); 
-            filteredVideosList = filteredVideosList.filter(videoData => 
-                tagsList.every(videoTag => 
-                    videoData.tags.orenoCharacterTags.some(charTag => videoTag.adjustForFiltering() === charTag.adjustForFiltering())                   
-                )
-            );
-        }
+            if(charactersFilter && charactersFilter.groups.all) // All characters in list must match
+            {            
+                queryText = queryText.replaceAll(charactersFilter[0], '');
+                let tagsList = charactersFilter.groups.characterList.adjustForFiltering().split(','); 
+                filteredVideosList = filteredVideosList.filter(videoData => 
+                    tagsList.every(videoTag => 
+                        videoData.tags.orenoCharacterTags.some(charTag => videoTag.adjustForFiltering() === charTag.adjustForFiltering())                   
+                    )
+                );
+            }
 
-        // Global tag blacklist from settings page
-        if(blacklistElement && blacklistElement.value) 
-        {            
-            let tagsList = Config.data.blacklist.adjustForFiltering().split(','); 
-            filteredVideosList = filteredVideosList.filter(videoData => 
-                !tagsList.some(videoTag => 
-                    (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
-                    (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
-                )
-            );
-        }
+            // Global tag blacklist from settings page
+            if(blacklistElement && blacklistElement.value) 
+            {            
+                let tagsList = Config.data.blacklist.adjustForFiltering().split(','); 
+                filteredVideosList = filteredVideosList.filter(videoData => 
+                    !tagsList.some(videoTag => 
+                        (tagCategoriesToUse != TagCategories.OrenoGeneral && videoData.tags.iwaraTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering())) || 
+                        (tagCategoriesToUse != TagCategories.IwaraGeneral && videoData.tags.orenoTags.some(whiteTag => videoTag.adjustForFiltering() === whiteTag.adjustForFiltering()))
+                    )
+                );
+            }
 
 
+
+
+            queryText = queryText.trim();   
+
+            if(queryText) // Title search
+            {            
+                filteredVideosList = filteredVideosList.filter((videoData) => 
+                    {
+                        return videoData.title.toLowerCase().includes(queryText.toLowerCase());
+                    });
+            }
+
+            filteredVideosListCombined = filteredVideosListCombined.concat(filteredVideosList)
+        })   
+    
         if(sorting)
-        {
-            queryText = queryText.replaceAll(sorting[0], '');
-
+        {    
+            let sortAscending = sorting.groups?.ascending  ? true : false;            
             const sortingFields = {
                 v: "views",
                 views: "views",
                 l: "likes",
                 likes: "likes",
-                a: "uploader",
-                artist: "uploader",
+                a: "uploaderDisplayName",
+                artist: "uploaderDisplayName",
                 d: "created",
                 date: "created",
                 u: "duration",
@@ -976,58 +1073,76 @@
             
             let sortBy = sortingFields[sorting.groups.sortType] ?? "date";                
 
-        
-
-            //filteredVideosList.sort((a, b) => b[sortBy] - a[sortBy]);
             switch(sortBy)
             {
                 case 'views':
                 case 'likes':
                 case 'duration':
                 case 'commentCount':                
-                    filteredVideosList.sort((a, b) => b[sortBy] - a[sortBy]);
+                    if(!sortAscending)
+                        filteredVideosListCombined.sort((a, b) => b[sortBy] - a[sortBy]);
+                    else
+                        filteredVideosListCombined.sort((a, b) => a[sortBy] - b[sortBy]);
                     break;
-                case 'uploader':
-                    filteredVideosList.sort((a, b) => a[sortBy].localeCompare(b[sortBy]));
+                case 'uploaderDisplayName':
+                    if(!sortAscending)
+                        filteredVideosListCombined.sort((a, b) => a[sortBy].localeCompare(b[sortBy]));
+                    else
+                        filteredVideosListCombined.sort((a, b) => b[sortBy].localeCompare(a[sortBy]));
                     break;                
                 case 'created':                  
                 default: // Here 'created' is hardcoded, since if default is triggered it's using some unknown string for sorting so we default to created
-                    filteredVideosList.sort((a, b) =>  b['created'].getTime() - a['created'].getTime());
+                    if(!sortAscending)                    
+                        filteredVideosListCombined.sort((a, b) =>  b['created'].getTime() - a['created'].getTime());
+                    else
+                        filteredVideosListCombined.sort((a, b) =>  a['created'].getTime() - b['created'].getTime());
                     break;                
                     
             }
             
         }
-
-        queryText = queryText.trim();   
-
-        if(queryText) // Title search
-        {            
-            filteredVideosList = filteredVideosList.filter((videoData) => 
-                {
-                    return videoData.title.toLowerCase().includes(queryText.toLowerCase());
-                });
-        }
-
-        
-
-
-            /*filteredVideosList = filteredVideosList.filter((videoData) => 
-                {
-                    return videoData.rating.toLowerCase() == 'general';
-                });*/
-   
-
         searchResultsContainerElement.innerHTML = "";
         // Render the video tiles on the screen
-        filteredVideosList.slice(0, MaxSearchResults).forEach((videoData) => {
+        filteredVideosListCombined.slice(0, MaxSearchResults).forEach((videoData) => {
             let videoTileElement = HtmlTileFromVideoData(videoData);
 
             if(videoTileElement)
                 searchResultsContainerElement.appendChild(videoTileElement)
         })
-
+    
     })
+
+
+/**
+ * Handle loading of the content database
+ */
+async function TryLoadDatabase()
+{
+
+    queryFieldElement.disabled = true;
+    queryFieldElement.value = "Loading database...";
+
+    let databaseBlobText = await (await DB.RetrieveFileFromDB("iwaraDatabase"))?.text();
+
+    if(databaseBlobText)
+        videosList = videosList.concat(JSON.parse(databaseBlobText))    
+
+    if(videosList.length == 0) // No DB file was loaded
+    {
+        queryFieldElement.disabled = true
+        queryFieldElement.value = "You need to import a database file to use SemenDaemon, click on the gear icon"
+    }
+    
+    videosList.forEach(videoData => { // Convert date strings in the content database into Date objects
+        if(!(videoData.created instanceof Date))
+            videoData.created = new Date(videoData.created);
+    })
+
+    queryFieldElement.disabled = false;
+    queryFieldElement.value = "";
+
+    AutoDBUpdateTrigger();
+}
 
 async function RunDatabaseUpdate()
 {
@@ -1046,8 +1161,15 @@ async function RunDatabaseUpdate()
     let loopDate = new Date();
     let pageLimitExceeded = true;
 
+    dbUpdateMenuIconElement.style.display = 'block';
+
     updateButtonElement.style.pointerEvents = 'none';
     progressBarElement.style.display = 'block';    
+
+    // Save the DB update date here instead of after the update finishes to prevent multiple updates from triggeting at the same time if user opens SD in another tab whilet this update is running
+    // The downside is if update gets interrupted it will think it still finished, but manual update will fix that ez
+    Config.data.lastDBUpdate = new Date();
+    Config.SaveConfig(); 
 
     pagesLoop:     
     for (let page = 0; page < 3000; page++) 
@@ -1114,8 +1236,7 @@ async function RunDatabaseUpdate()
         catch (error) {            
             apiFetchErrors.push(error)
             console.error('Error fetching data:', error);
-        }        
-
+        }                
 
     }
 
@@ -1130,12 +1251,23 @@ async function RunDatabaseUpdate()
 
     progressBarElement.innerHTML += '<br><span style="color: #00bf00">Database update was finished</span>'    
     updateButtonElement.style.pointerEvents = 'auto';
-    console.info("SemenDaemon database update finished.")            
+    console.info("SemenDaemon database update finished.")      
+    dbUpdateMenuIconElement.style.display = 'none';        
 }
 
+/** Check if enough time has passed since last db update and if yes, run another one */
+async function AutoDBUpdateTrigger()
+{
+    let lastDbUpdate = new Date(Config.data.lastDBUpdate ?? 0);
+    
+    if(((new Date()).getTime() - lastDbUpdate.getTime()) < 6 * 3600 * 1000) 
+        return;
 
+    console.info("Triggering DB update since time limit expired. Last update was: " + lastDbUpdate.toLocaleString())
+    RunDatabaseUpdate();
+}
 
-/*############### IndexedDB api #################*/
+/*############### IndexedDB API #################*/
     /**
      * Collection of functions which handle interacting with the browser's indexedDB
      */
@@ -1326,7 +1458,8 @@ async function RunDatabaseUpdate()
             loadImages: true,
             lastSearch: "",
             blacklist: "",
-            version: 1.0
+            version: 1.1,
+            lastDBUpdate: (new Date())
         };
     
         /**
@@ -1447,31 +1580,19 @@ async function RunDatabaseUpdate()
         blacklistElement.value = Config.data.blacklist;
         
         if(Config.data.showIntroduction) // If this is the first time using this addon, show the introduction
-            semenDaemonContainerElement.querySelector('#introductionContainer').style.display = 'block'
+            semenDaemonContainerElement.querySelector('#introductionContainer').style.display = 'block';
+                
+        
         
     })();
     
     // Load the content database from browser's IndexedDB into a variable/RAM
-    (async () => {            
+    /*(async () => {            
         
-        let databaseBlobText = await (await DB.RetrieveFileFromDB("iwaraDatabase"))?.text();
 
-        if(databaseBlobText)
-            videosList = videosList.concat(JSON.parse(databaseBlobText))    
-
-        if(videosList.length == 0) // No DB file was loaded
-        {
-            queryFieldElement.disabled = true
-            queryFieldElement.value = "You need to import a database file to use SemenDaemon, click on the gear icon"
-        }
-        
-        videosList.forEach(videoData => { // Convert date strings in the content database into Date objects
-            if(!(videoData.created instanceof Date))
-                videoData.created = new Date(videoData.created);
-        })
 
         
-    })();
+    })();*/
 
     queryFieldElement.focus();
 
