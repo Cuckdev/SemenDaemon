@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SemenDaemon
 // @namespace    cuckIndustries
-// @version      v1.11
+// @version      v1.2
 // @description  Video search tool for iwara.tv
 // @author       Cuckdev
 // @match        https://www.iwara.tv/*
@@ -15,7 +15,7 @@
 // For DEV loader script method, since GM object is not available in the injected script
 if(!GM)
 {
-    var GM = {'info': {'script': {'version': 1.11}}}
+    var GM = {'info': {'script': {'version': 1.2}}}
 }
 
 (function() {
@@ -60,19 +60,39 @@ if(!GM)
         return number.toString();
     }    
 
-    var thumbCycleElement = null;
-    var thumbCycleData = null;
-    var thumbCycleIndex = 0;
+    var ThumbCycleElement = null;
+    var ThumbCycleData = null;
+    var ThumbCycleIndex = 0;
 
     setInterval(() => { // Thumbnail cycler, for the old type of slideshow video previews
-            if(!thumbCycleElement || !thumbCycleData)
+            if(!ThumbCycleElement || !ThumbCycleData)
                 return;        
 
-            thumbCycleIndex = thumbCycleIndex++ % 10 + 1;
-            let videoThumbnailUrl = `https://i.iwara.tv/image/thumbnail/${thumbCycleData.fileId}/thumbnail-${thumbCycleIndex.toString().padStart(2, '0')}.jpg`
-            thumbCycleElement.src = videoThumbnailUrl;
+            ThumbCycleIndex = ThumbCycleIndex++ % 10 + 1;
+            let videoThumbnailUrl = `https://i.iwara.tv/image/thumbnail/${ThumbCycleData.fileId}/thumbnail-${ThumbCycleIndex.toString().padStart(2, '0')}.jpg`
+            ThumbCycleElement.src = videoThumbnailUrl;
         
         }, 1000)
+
+
+    var VideoElementToScrub = null;
+    var ScrubVideoDuration = 120;
+    var LastScrubPositon = 0;
+
+    setInterval(() => { // Video scrubber
+        if(!VideoElementToScrub)
+            return;
+
+        let scrubPos = GetScrubVideoPosition(VideoElementToScrub);
+
+        if(Math.abs(LastScrubPositon - scrubPos) < 5) // Only scrub if mouse moved since last time
+            return;
+
+        VideoElementToScrub.play();
+        VideoElementToScrub.currentTime = Math.round(ScrubVideoDuration * (scrubPos / 100))
+        LastScrubPositon = scrubPos;
+
+    }, 1000)
 
     /**
      * Generate HTML tile representing the given video data object, to be displayed in the search results
@@ -102,13 +122,33 @@ if(!GM)
 
             if(videoData.fileId) // Switch to animated thumbnail on mouse hover, (embeded vids don't have animated thumbnail versions)
             {
-                videoTileElement.addEventListener('mouseover', (e) => videoTileElement.querySelector(".thumbnail img").src = videoThumbnailAnimatedUrl);
-                videoTileElement.addEventListener('mouseout', (e) => videoTileElement.querySelector(".thumbnail img").src = videoThumbnailUrl);
+                videoTileElement.addEventListener('mouseover', (e) => 
+                    {
+                        let imageElement = videoTileElement.querySelector(".thumbnail img");                        
+                        imageElement.src = videoThumbnailAnimatedUrl;                                            
+                    });
+
+                videoTileElement.addEventListener('mouseleave', (e) => // Mouseout fires when any child element is left, mouseleave only fires when the element it's attached to is left
+                    {
+                        VideoElementToScrub = null;
+                        ThumbCycleElement = null;
+                        ThumbCycleData = null;
+
+
+                        var imgElement = videoTileElement.querySelector(".thumbnail img");
+                        imgElement.style.display = "inline";
+                        imgElement.src = videoThumbnailUrl;
+
+                        let videoElement = videoTileElement.querySelector(".thumbnail video");
+
+                        if(videoElement)
+                            videoElement.parentNode.removeChild(videoElement);                        
+                    });
             }
 
             videoTileElement.innerHTML = 
             /* html */`            
-                    <div class="thumbnail"><img src="${videoThumbnailUrl}" loading="lazy"></div>    
+                    <div class="thumbnail"><img src="${videoThumbnailUrl}" loading="lazy"></div>                        
                     <div class="title">${videoData.title}</div>                
                     <div class="pfp"><img src="${avatarUrl}" loading="lazy"></div> 
                                     <div class="uploader" title="${videoData.uploader}" style="cursor: pointer">${videoData.uploaderDisplayName}</div>
@@ -122,15 +162,15 @@ if(!GM)
             // Older videos don't have animated preview.webp, but instead scrub through pregenerated thumbnail list. If preview.webp fails to load, it means the video likely uses the old preview type, so we mark this video for the thumbnail cycler function which will simulate the video preview
             videoTileElement.querySelector(".thumbnail img").addEventListener('error', (e) => 
             {                
-                thumbCycleElement = e.target;
-                thumbCycleData = videoData;
+                ThumbCycleElement = e.target;
+                ThumbCycleData = videoData;
                 e.target.src = thumbnailPlaceholder;
 
-                e.target.addEventListener("mouseleave", (e) => { // When mouse moves away from thumbnail restore the previous thumbnail
-                    thumbCycleElement = null;
-                    thumbCycleData = null;
+                /*e.target.addEventListener("mouseleave", (e) => { // When mouse moves away from thumbnail restore the previous thumbnail
+                    ThumbCycleElement = null;
+                    ThumbCycleData = null;
                     e.target.src = videoThumbnailUrl; 
-                })            
+                })     */       
             });
 
             videoTileElement.querySelector(".pfp img").addEventListener('error', (e) => e.target.src = defaultAvatarUrl)        
@@ -145,11 +185,58 @@ if(!GM)
                         window.open("https://www.iwara.tv/video/" + videoTileElement.dataset.videoid,"_blank"); // Note: dataset name has to be lowercase
                 });
 
+                    
+            videoTileElement.querySelector(".thumbnail").addEventListener('contextmenu', async e => {
+                if(videoTileElement.querySelector(".thumbnail video")) 
+                    return;
+
+                let videoElement = document.createElement('video');
+                e.preventDefault(); // Stop right click menu from showing up
+                let videoUrl = (await IwaraApi.GetVideoData(videoData.videoId)).find(s => s.name == '360').src.view;
+                
+                videoElement.src = videoUrl;
+
+                videoTileElement.querySelector(".thumbnail img").style.display = "none";
+                
+                //videoElement.addEventListener('loadedmetadata', e => videoElement.play());
+                VideoElementToScrub = videoElement;
+                ScrubVideoDuration = videoData.duration > 0 ? videoData.duration : 120;
+                videoTileElement.querySelector(".thumbnail").appendChild(videoElement);
+                
+                return false;
+            });
+
             return videoTileElement;
 
         } catch (error) {            
             return null;
         }
+    }
+
+    /**
+     * Based on where the mouse is on the video tile, calculate what part of the video in % we want to scrub to
+     * @returns Video scrub position in %
+     */
+    function GetScrubVideoPosition(videoElement) 
+    {        
+        const rect = videoElement.getBoundingClientRect();
+
+        // Check if cursor is outside the video bounds
+        if (
+            mouseCoords.x < rect.left ||
+            mouseCoords.x > rect.right ||
+            mouseCoords.y < rect.top ||
+            mouseCoords.y > rect.bottom
+        ) {
+            return -1;
+        }
+
+        // Calculate horizontal percentage
+        const relativeX = mouseCoords.x - rect.left;
+        const percent = (relativeX / rect.width) * 100;
+
+        // Return rounded percentage (e.g., 10.2% → 10, 89.8% → 90)
+        return Math.round(percent);
     }
 
     /**
@@ -345,7 +432,7 @@ if(!GM)
                 
             }
 
-            #searchResults > .videoTile > .thumbnail > img /* Thumbnail  image */
+            #searchResults > .videoTile > .thumbnail > img, #searchResults > .videoTile > .thumbnail > video /* Thumbnail  image */
             {
                 border-radius: 10px 10px 0 0;
                 width: 100%;
@@ -561,15 +648,10 @@ if(!GM)
     semenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="changelogContainer" class="semenDaemonPage">
         <div class="closePage">❌</div>
-        <h2 style="margin: 0px 0 10px 0">Changelog v1.1</h2>        
+        <h2 style="margin: 0px 0 10px 0">Changelog v1.2</h2>        
         <p><ul>
-            <li>Favorites can now be edited with Alt + Click and deleted with Alt + Right click</li>
-            <li>Favorites are now sorted by using the sort field</li>
-            <li>SemenDaemon window can be toggled by clicking on the menu link (or by Alt + S hotkey)</li>
-            <li>Chained OR search filtering is now supported, see filter guide page for details</li>
-            <li>Reversed sorting order is now supported with sort<:likes </li>
-            <li>Database data are now only loaded when SemenDaemon is first opened, in order to optimize RAM usage</li>
-            <li>Database updater now triggers itself automatically</li>        
+            <li>You can now recall last searched query, by pressing arrow down in the search field</li>
+            <li>Videos can now be previewed by right mouse clicking the thumbanils. You can scrub through the video by moving the mouse cursor left and right on the video tile.</li>   
         </ul></p>
     </div>
     `;
@@ -636,6 +718,16 @@ if(!GM)
                 <li><span class="argName">Alt + Click</span> - <i>On a favorite filter</i> - Edit favorite filter</li>                
                 <li><span class="argName">Alt + Right click</span> - <i>On a favorite filter</i> - Delete favorite filter</li>                
                 <li><span class="argName">Alt + Click</span> - <i>On a video</i> - Open video on Oreno instead of Iwara, if we have oreno ID for that video.</li>               
+                <li><span class="argName">Right click</span> - <i>On a video</i> - Play full preview with sound. Use mouse cursor to scrub through the video. If the cursor is in the middle of the video tile, a 3 minute video will start playing from 1:30.</li>     
+            </ul>
+        </p>
+        <h2 style="margin: 0px 0 10px 0">Troubleshooting</h2>        
+        <p>
+            <ul>
+                <li><b>Thumbnail load fail</b> - Some older videos don't have working thumbanils, so those won't load.</li>                                
+                <li><b>Brief thumbnail load fail</b> - For videos that use the old thumbnail slideshow preview it will briefly flash the thumbnail fail image, but then starts showing the preview. This is normal. </li>
+                <li><b>Video shows up in search results, but doesn't exist on the site</b> -  Video was either deleted, or you don't have perms to access it (you aren't logged it, or have some of its tags blacklisted on Iwara)</li>
+                <li><b>Database autoupdate is not working</b> -  If previous autoupdate failed, you have to run it once manually (click settings gear icon) and then autoupdates will work again.</li>
             </ul>
         </p>
         <h2 style="margin: 0px 0 10px 0">Data backup</h2>        
@@ -698,8 +790,11 @@ if(!GM)
     const searchResultsContainerElement = semenDaemonContainerElement.querySelector('#searchResults');
     const searchQueryPlaceholders = ["What is your coomer query?", "What are we edging to today?", "Fap time!", "Switching to your side arm is faster than reloading", "Bobs or vegana, whichever will it be?", "Ara ara..."];    
     const blacklistElement = semenDaemonContainerElement.querySelector("#blacklist")    
+    const mouseCoords = {x: 0, y: 0};
     var dbUpdateMenuIconElement;
 
+    document.addEventListener('mousemove', (e) => {mouseCoords.x = e.clientX; mouseCoords.y = e.clientY;}); // Keep recording current mouse coordinates
+    
     document.body.appendChild(semenDaemonContainerElement);
 
     
@@ -795,6 +890,13 @@ if(!GM)
             e.stopPropagation()
             e.stopImmediatePropagation();
         })
+
+    queryFieldElement.addEventListener('keyup', e => {
+        if(e.key != 'ArrowDown')
+            return;
+
+        queryFieldElement.value = Config.data.lastSearchedQuery ?? "";
+    })
             
 /*############### SEARCH INPUT AND FILTERING #################*/
     // Makes callable function on strings via stringvar.adjustForFiltering() and preps the string to be used for filter comparison
@@ -808,7 +910,7 @@ if(!GM)
     queryFieldElement.addEventListener('keydown', (e) => {
         if(e.key !== 'Enter')
             return;
-
+        
         const TagCategories =
         {
             All: 0,
@@ -819,6 +921,10 @@ if(!GM)
         }
 
         let queryText = e.target.value;
+
+        Config.data.lastSearchedQuery = queryText;
+        Config.SaveConfig();
+
         // Sorting is per whole query, not per segment like the rest of filters, so pull it here, before the segmentation happens
         let sorting = queryText.match(/s(?:ort)?(?<ascending><)?:(?<sortType>[a-z](?:[a-z]{2,10})?)/ui);    
 
@@ -1184,7 +1290,7 @@ async function RunDatabaseUpdate()
         
         try 
         {
-            const iwaraCatalogPageData = await IwaraApi.GetPageData(page);
+            const iwaraCatalogPageData = await IwaraApi.GetCatalogPageData(page);
 
             progressBarElement.innerHTML = `Processed: <br>
             Pages: ${totalPages}<br>
@@ -1463,8 +1569,9 @@ async function AutoDBUpdateTrigger()
             loadImages: true,
             lastSearch: "",
             blacklist: "",
-            version: 1.1,
-            lastDBUpdate: (new Date())
+            version: 1.2,
+            lastDBUpdate: (new Date()),
+            lastSearchedQuery: ""
         };
     
         /**
@@ -1530,11 +1637,54 @@ async function AutoDBUpdateTrigger()
     class IwaraApi
     {
         /**
-         * Retrieve data from the iwara api for the given page
+         * Retrieve data from the iwara api for the given video catalog page
         * @param {int} page Page number (0 based index)
         */
-        static GetPageData(page = 0) {
+        static GetCatalogPageData(page = 0) {
             return fetch('https://api.iwara.tv/videos?sort=date&page=' + page, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + apiAccessToken,
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json(); // Parse JSON
+                });
+        }
+
+                /**
+         * Retrieve data from the iwara api for the given video
+        * @param {string} page Page number (0 based index)
+        */
+        static GetVideoPageData(videoId) {
+            return fetch('https://api.iwara.tv/video/' + videoId, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + apiAccessToken,
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json(); // Parse JSON
+                });
+        }
+
+        /**
+         * Retrieve data for the video player playback
+        * @param {string} page Page number (0 based index)
+        */
+        static async GetVideoData(videoId) 
+        {
+            let videoPageData = await this.GetVideoPageData(videoId);
+
+            return fetch(videoPageData.fileUrl, {
                 method: 'GET',
                 headers: {
                     'Authorization': 'Bearer ' + apiAccessToken,
