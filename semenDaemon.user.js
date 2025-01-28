@@ -652,6 +652,7 @@ if(!GM)
         <p><ul>
             <li>You can now recall last searched query, by pressing arrow down in the search field</li>
             <li>Videos can now be previewed by right mouse clicking the thumbanils. You can scrub through the video by moving the mouse cursor left and right on the video tile.</li>   
+            <li>Be aware that during low traffic times the video previews load quickly, but during peak load times it can be slow and they can take like 10 seconds to load.</li>   
         </ul></p>
     </div>
     `;
@@ -728,6 +729,7 @@ if(!GM)
                 <li><b>Brief thumbnail load fail</b> - For videos that use the old thumbnail slideshow preview it will briefly flash the thumbnail fail image, but then starts showing the preview. This is normal. </li>
                 <li><b>Video shows up in search results, but doesn't exist on the site</b> -  Video was either deleted, or you don't have perms to access it (you aren't logged it, or have some of its tags blacklisted on Iwara)</li>
                 <li><b>Database autoupdate is not working</b> -  If previous autoupdate failed, you have to run it once manually (click settings gear icon) and then autoupdates will work again.</li>
+                <li><b>Video previews take forever seconds to load</b> - Be aware that during low traffic times the video previews load quickly, but during peak load times it can be slow and they can take like 10 seconds to load.</li>   
             </ul>
         </p>
         <h2 style="margin: 0px 0 10px 0">Data backup</h2>        
