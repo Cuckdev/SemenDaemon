@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SemenDaemon
 // @namespace    cuckIndustries
-// @version      v1.2
+// @version      v1.3
 // @description  Video search tool for iwara.tv
 // @author       Cuckdev
 // @match        https://www.iwara.tv/*
@@ -15,16 +15,19 @@
 // For DEV loader script method, since GM object is not available in the injected script
 if(!GM)
 {
-    var GM = {'info': {'script': {'version': 1.2}}}
+    var GM = {'info': {'script': {'version': 1.3}}}
 }
 
-(function() {
+(async function() {
     'use strict';
     var videosList = []    
     const MaxSearchResults = 1000;
-    const apiAccessToken = localStorage.getItem("token")
-    const semenDaemonContainerElement = document.createElement('div');
-    semenDaemonContainerElement.id = "semenDaemonContainer";    
+    const ApiAuthToken = localStorage.getItem("token")
+    const SemenDaemonContainerElement = document.createElement('div');
+    var UserName = '';
+    SemenDaemonContainerElement.id = "semenDaemonContainer";    
+
+    setInterval(()=>{UserName = document.querySelector(".userDropdownContent li:first-child a") ? (document.querySelector(".userDropdownContent li:first-child a").href.match(/[^/]+\/?$/)?.[0] || "") : "";}, 1000);
 
     /**
      * Convert seconds to formatted timestamp
@@ -244,7 +247,7 @@ if(!GM)
      */
     function RenderFilterFavorites()
     {
-        let filterContainerElement = semenDaemonContainerElement.querySelector(".favoriteFilters");
+        let filterContainerElement = SemenDaemonContainerElement.querySelector(".favoriteFilters");
         filterContainerElement.innerHTML = "";
 
         Config.data.favoriteFilters.sort((a, b) => a.sorting - b.sorting);
@@ -274,10 +277,10 @@ if(!GM)
                 {
                     Config.data.favoriteFilters = Config.data.favoriteFilters.filter(f => f !== filterData); // Delete the filter before we edit, so it then just gets re-added as a new filter making it look like an edit. If the edit is not finished, the filter array won't get saved so the deletion won't get applied, so it  can't be accidentaly deleted.
                     document.querySelector("#addNewFilterFavoritePage").style.display = 'block';
-                    semenDaemonContainerElement.querySelector('#favoriteFilter_name').value = filterData.name;
-                    semenDaemonContainerElement.querySelector('#favoriteFilter_query').value = filterData.query;
-                    semenDaemonContainerElement.querySelector('#favoriteFilter_color').value = filterData.color;
-                    semenDaemonContainerElement.querySelector('#favoriteFilter_sorting').value = filterData.sorting;                    
+                    SemenDaemonContainerElement.querySelector('#favoriteFilter_name').value = filterData.name;
+                    SemenDaemonContainerElement.querySelector('#favoriteFilter_query').value = filterData.query;
+                    SemenDaemonContainerElement.querySelector('#favoriteFilter_color').value = filterData.color;
+                    SemenDaemonContainerElement.querySelector('#favoriteFilter_sorting').value = filterData.sorting;                    
                     return;
                 }
 
@@ -327,7 +330,7 @@ if(!GM)
                 // Triggered if we are freshly updated the script and coming from an older version possilby
                 if(Config.data.version < parseFloat(GM.info.script.version)) // If this is the first time using this addon, show the introduction
                 {            
-                    semenDaemonContainerElement.querySelector('#changelogContainer').style.display = 'block';
+                    SemenDaemonContainerElement.querySelector('#changelogContainer').style.display = 'block';
                     Config.data.version = parseFloat(GM.info.script.version);
                     Config.SaveConfig();
                 }
@@ -336,7 +339,7 @@ if(!GM)
                     TryLoadDatabase();
                                     
 
-                semenDaemonContainerElement.style.display = (semenDaemonContainerElement.style.display == 'block' ? 'none' : 'block');
+                SemenDaemonContainerElement.style.display = (SemenDaemonContainerElement.style.display == 'block' ? 'none' : 'block');
                 queryFieldElement.focus();
                 e.preventDefault(); 
                 e.stopImmediatePropagation()
@@ -359,7 +362,7 @@ if(!GM)
     setInterval(CreateSemenDaemonMenuButton, 500) // Sometimes the onload method doesn't work, so this is a backup
 
 /*############### MAIN PAGE CSS #################*/
-    semenDaemonContainerElement.innerHTML += /*html*/`
+    SemenDaemonContainerElement.innerHTML += /*html*/`
         <style>
             #semenDaemonContainer 
             {            
@@ -376,6 +379,14 @@ if(!GM)
                 display: none;      
             }
         /* SEARCH STYLES */
+
+            #semenDaemonContainer .searchBlockContainer
+            {
+                position: sticky; 
+                top: 0; 
+                background-color: rgba(31,34,40, 0.8);
+            }
+
             #semenDaemonContainer #searchQuery 
             {
                 display: inline-block; 
@@ -533,7 +544,7 @@ if(!GM)
 
             #semenDaemonContainer .cumpMenu div:first-child
             {
-                width: calc(100% - 120px);
+                width: calc(100% - 140px);
             }
 
             #semenDaemonContainer .cumpMenu .favoriteFilters
@@ -620,45 +631,50 @@ if(!GM)
         `;
 
 /*############### MAIN PAGE HTML #################*/
-    semenDaemonContainerElement.innerHTML += /*html*/`
-        <div class="closePage">❌</div>
-        <label for="searchQuery">🔎</label><input id="searchQuery">
-        <div class="cumpMenu">
-            <div class="favoriteFilters"></div>
-            <div>                
-                <span  class="openWindow addFavoriteFilter" data-page="addNewFilterFavoritePage" title="Save current search query into favorites.\nCtrl + click existing filter to delete it.">➕</span>
-                <span  class="openWindow" data-page="searchHowto" title="Show how-to-use instructions for search">📄</span>
-                <span  class="openWindow" data-page="introductionContainer" title="Open introduction page">👋</span>
-                <span  class="openWindow" data-page="configContainer" title="Open settings page">⚙️</span>
-            </div>            
-        </div>     
-        <div id="searchResults"></div>    
-        <div id="addNewFilterFavoritePage" class="semenDaemonPage">
+    SemenDaemonContainerElement.innerHTML += /*html*/`
+    <div class="closePage">❌</div>
+        <div class="searchBlockContainer">
+            
+            <label for="searchQuery">🔎</label><input id="searchQuery">
+            <div class="cumpMenu">
+                <div class="favoriteFilters"></div>
+                <div>                
+                    <span  class="openWindow addFavoriteFilter" data-page="addNewFilterFavoritePage" title="Save current search query into favorites.\nCtrl + click existing filter to delete it.">➕</span>
+                    <span  class="openWindow" data-page="searchHowto" title="Show how-to-use instructions for search">📄</span>
+                    <span  class="openWindow" data-page="introductionContainer" title="Open introduction page">👋</span>
+                    <span  class="openWindow" data-page="recAlgoContainer" title="Artist recommendation tool">🫅</span>
+                    <span  class="openWindow" data-page="configContainer" title="Open settings page">⚙️</span>
+                </div>            
+            </div>     
+
+            <div id="addNewFilterFavoritePage" class="semenDaemonPage">
             <label for="favoriteFilter_name">Name:</label><input type="text" id="favoriteFilter_name"><br>
             <label for="favoriteFilter_query">Query:</label><input type="text" id="favoriteFilter_query"><br>
             <label for="favoriteFilter_color">Color:</label><input type="text" placeholder="#282c34" id="favoriteFilter_color" title="Background color to use for this filter button"><br>
             <label for="favoriteFilter_sorting">Sorting:</label><input type="number" id="favoriteFilter_sorting" value="1" title="Filter buttons are sorted by this, so if you set this to 1 and other filters to 2, this one will be displayed first"><br><br>
             <input type="button" value="Add filter">
         </div>    
+        </div>
+        <div id="searchResults"></div>    
+
         
 
     `;
 
 /*############### CHANGELOG PAGE HTML #################*/
-    semenDaemonContainerElement.innerHTML += /*html*/`  
+    SemenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="changelogContainer" class="semenDaemonPage">
         <div class="closePage">❌</div>
-        <h2 style="margin: 0px 0 10px 0">Changelog v1.2</h2>        
+        <h2 style="margin: 0px 0 10px 0">Changelog v1.3</h2>        
         <p><ul>
-            <li>You can now recall last searched query, by pressing arrow down in the search field</li>
-            <li>Videos can now be previewed by right mouse clicking the thumbanils. You can scrub through the video by moving the mouse cursor left and right on the video tile.</li>   
-            <li>Be aware that during low traffic times the video previews load quickly, but during peak load times it can be slow and they can take like 10 seconds to load.</li>   
+            <li>Added artist finder tool, which recommends you artists based on artists that people whole liked the same videos as you follow. You can access it by clicking the 🫅 icon under the search bar.</li>
+            <li>Search bar is now sticky, as you scroll down it will stay visible.</li>
         </ul></p>
     </div>
     `;
 
 /*############### CONFIG PAGE HTML #################*/
-    semenDaemonContainerElement.innerHTML += /*html*/`  
+    SemenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="configContainer" class="semenDaemonPage">
         <div class="closePage">❌</div>
         <h2 style="margin: 0px 0 10px 0">SemenDaemon Config</h2>        
@@ -680,8 +696,55 @@ if(!GM)
     </div>
     `;
 
+/*############### RECOMENDATION ALGO PAGE HTML #################*/
+SemenDaemonContainerElement.innerHTML += /*html*/`  
+<div id="recAlgoContainer" class="semenDaemonPage">
+    <div class="closePage">❌</div>
+    <h2 style="margin: 0px 0 10px 0">Artist finder tool</h2>      
+    <p>This tool will atempt to find new artists you might like, by analyzing your liked videos.</p>
+    <p>How it works:</p>
+    <ul>
+        <li>Fetches several pages of your liked videos (so you need to have at least some liked videos for this to work)</li>
+        <li>Looks at users who liked those videos</li>
+        <li>If an user has liked say 10 same videos as you, it's likely your tastes are similar, the higher the number, the more similar taste in videos, at least in theory.</li>
+        <li>Looks at which artists these likeminded users are following</li>
+        <li>Scores the artists based how many of the likeminded users are following them, where if more likeminded user is following that artist, it increases his score more.</li>
+        <li>Returns a list of the highest scored artists and most likeminded users.</li>
+    </ul>
+    <p>Of course this won't be perfect, but in theory, there should be a decent chance of it containing some new artists you might like, since other likeminded users also like them. Might be decent results, might be crap, so give it a shot and find out.</p>
+    <a id="analyzeLikes" style="cursor: pointer">Begin analysis</a> (it may take a while, so be patient)
+    <style>
+        #recAlgoProgressBar {
+        
+        display: none; /* grid */
+        grid-template-columns: auto 1fr;
+        gap: 0.5rem 1rem;
+        align-items: center;
+        margin-top: 20px;
+        }
+
+        .label {
+        font-weight: bold;
+        }
+    </style>
+    <div id="recAlgoProgressBar">             
+        <div class="label">Liked videos pages loaded:</div>
+        <div class="value">-</div>
+        
+        <div class="label">Users processed:</div>
+        <div class="value">-</div>
+        
+        <div class="label">Artists processed:</div>
+        <div class="value">-</div>
+        
+    </div>
+    <div id="recAlgoResults"></div>
+
+</div>
+`;
+
 /*############### INTRODUCTION PAGE HTML #################*/
-    semenDaemonContainerElement.innerHTML += /*html*/`  
+    SemenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="introductionContainer" class="semenDaemonPage" style="width: 800px; text-align: justify">
         <div class="closePage">❌</div>
         <h2 style="margin: 0px 0 10px 0">Introduction to SemenDaemon</h2>        
@@ -742,7 +805,7 @@ if(!GM)
     `;
 
 /*############### SEARCH HOW-TO PAGE HTML #################*/
-    semenDaemonContainerElement.innerHTML += /*html*/`  
+    SemenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="searchHowto", class="semenDaemonPage">        
         <div class="closePage">❌</div>
         <h2 style="margin: 0px 0 10px 0">How to filter</h2>        
@@ -788,42 +851,42 @@ if(!GM)
     `;
 /*############### ELEMENT VARS FOR THE IMPORTANT PAGE ELEMENTS #################*/
     // Note this must be done after we amended all the HTML stuff to the page
-    const queryFieldElement = semenDaemonContainerElement.querySelector('#searchQuery');    
-    const searchResultsContainerElement = semenDaemonContainerElement.querySelector('#searchResults');
+    const queryFieldElement = SemenDaemonContainerElement.querySelector('#searchQuery');    
+    const searchResultsContainerElement = SemenDaemonContainerElement.querySelector('#searchResults');
     const searchQueryPlaceholders = ["What is your coomer query?", "What are we edging to today?", "Fap time!", "Switching to your side arm is faster than reloading", "Bobs or vegana, whichever will it be?", "Ara ara..."];    
-    const blacklistElement = semenDaemonContainerElement.querySelector("#blacklist")    
+    const blacklistElement = SemenDaemonContainerElement.querySelector("#blacklist")    
     const mouseCoords = {x: 0, y: 0};
     var dbUpdateMenuIconElement;
 
     document.addEventListener('mousemove', (e) => {mouseCoords.x = e.clientX; mouseCoords.y = e.clientY;}); // Keep recording current mouse coordinates
     
-    document.body.appendChild(semenDaemonContainerElement);
+    document.body.appendChild(SemenDaemonContainerElement);
 
     
     
 /*############### HTML GUI LOGIC STUFF #################*/    
-    semenDaemonContainerElement.querySelectorAll(".openWindow").forEach(element => element.addEventListener("click", e => semenDaemonContainerElement.querySelector('#' + e.target.dataset.page).style.display = "block"));
-    semenDaemonContainerElement.querySelectorAll(".closePage").forEach(element => element.addEventListener("click", e => e.target.parentElement.style.display = "none"));
-    semenDaemonContainerElement.querySelector("#introductionContainer .closePage").addEventListener("click", e => {
+    SemenDaemonContainerElement.querySelectorAll(".openWindow").forEach(element => element.addEventListener("click", e => SemenDaemonContainerElement.querySelector('#' + e.target.dataset.page).style.display = "block"));
+    SemenDaemonContainerElement.querySelectorAll(".closePage").forEach(element => element.addEventListener("click", e => e.target.parentElement.style.display = "none"));
+    SemenDaemonContainerElement.querySelector("#introductionContainer .closePage").addEventListener("click", e => {
         Config.data.showIntroduction = false;
         Config.SaveConfig();
     })    
 
     // Prefill the favorite filter form query field
-    semenDaemonContainerElement.querySelector(".addFavoriteFilter").addEventListener("click", e => 
+    SemenDaemonContainerElement.querySelector(".addFavoriteFilter").addEventListener("click", e => 
         {
-            semenDaemonContainerElement.querySelector('#favoriteFilter_query').value = queryFieldElement.value;
-            semenDaemonContainerElement.querySelector('#favoriteFilter_name').focus();
+            SemenDaemonContainerElement.querySelector('#favoriteFilter_query').value = queryFieldElement.value;
+            SemenDaemonContainerElement.querySelector('#favoriteFilter_name').focus();
         });
 
     // Add new filter
-    semenDaemonContainerElement.querySelector("#addNewFilterFavoritePage input[type=button]").addEventListener("click", e => 
+    SemenDaemonContainerElement.querySelector("#addNewFilterFavoritePage input[type=button]").addEventListener("click", e => 
         {
             let favoriteFilter = {
-                name: semenDaemonContainerElement.querySelector('#favoriteFilter_name').value,
-                query: semenDaemonContainerElement.querySelector('#favoriteFilter_query').value,
-                color: semenDaemonContainerElement.querySelector('#favoriteFilter_color').value,
-                sorting: semenDaemonContainerElement.querySelector('#favoriteFilter_sorting').value,
+                name: SemenDaemonContainerElement.querySelector('#favoriteFilter_name').value,
+                query: SemenDaemonContainerElement.querySelector('#favoriteFilter_query').value,
+                color: SemenDaemonContainerElement.querySelector('#favoriteFilter_color').value,
+                sorting: SemenDaemonContainerElement.querySelector('#favoriteFilter_sorting').value,
             };
 
             if(favoriteFilter.name && favoriteFilter.query)
@@ -833,12 +896,12 @@ if(!GM)
                 Config.SaveConfig();     
             }
 
-            semenDaemonContainerElement.querySelector("#addNewFilterFavoritePage").style.display = "none";
+            SemenDaemonContainerElement.querySelector("#addNewFilterFavoritePage").style.display = "none";
 
         });
     
     // If user picks a json file in the picker, import it as content DB
-    semenDaemonContainerElement.querySelector("#filePicker_db").addEventListener("change", async (event) => 
+    SemenDaemonContainerElement.querySelector("#filePicker_db").addEventListener("change", async (event) => 
         {
             const file = event.target.files[0];
 
@@ -859,24 +922,24 @@ if(!GM)
         });
 
     
-    semenDaemonContainerElement.querySelector("#fileExport_config").addEventListener("click", async event => GenerateDownloadFile('semenDaemonConfig_' + (new Date()).toISOString().split('T')[0], JSON.stringify(Config.data))); // Export semenDaemon config into JSON file and offer download to user    
-    semenDaemonContainerElement.querySelector("#fileExport_db").addEventListener("click", async event => GenerateDownloadFile('iwaraDB_' + (new Date()).toISOString().split('T')[0], JSON.stringify(videosList))); // Same as above but for the content database 
+    SemenDaemonContainerElement.querySelector("#fileExport_config").addEventListener("click", async event => GenerateDownloadFile('semenDaemonConfig_' + (new Date()).toISOString().split('T')[0], JSON.stringify(Config.data))); // Export semenDaemon config into JSON file and offer download to user    
+    SemenDaemonContainerElement.querySelector("#fileExport_db").addEventListener("click", async event => GenerateDownloadFile('iwaraDB_' + (new Date()).toISOString().split('T')[0], JSON.stringify(videosList))); // Same as above but for the content database 
     
-    semenDaemonContainerElement.querySelector("#blacklist").addEventListener("blur", (e) => 
+    SemenDaemonContainerElement.querySelector("#blacklist").addEventListener("blur", (e) => 
         {
             Config.data.blacklist = e.target.value;
             Config.SaveConfig();        
         });
         
-    semenDaemonContainerElement.querySelector("#dbScrapeUpdateProgressButton").addEventListener("click", e => 
+    SemenDaemonContainerElement.querySelector("#dbScrapeUpdateProgressButton").addEventListener("click", e => 
         { // Start database update if eligible
             if(videosList.length < 100000)
             {
-                semenDaemonContainerElement.querySelector('#noDbFileFounDerror').style.display = "block";
+                SemenDaemonContainerElement.querySelector('#noDbFileFounDerror').style.display = "block";
                 return;
             }
             
-            semenDaemonContainerElement.querySelector('#noDbFileFounDerror').style.display = "none";
+            SemenDaemonContainerElement.querySelector('#noDbFileFounDerror').style.display = "none";
             RunDatabaseUpdate();
         });
                     
@@ -1222,6 +1285,12 @@ if(!GM)
             if(videoTileElement)
                 searchResultsContainerElement.appendChild(videoTileElement)
         })
+
+        // Scroll the page back to the top so user can see the results from the start
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+          });
     
     })
 
@@ -1265,8 +1334,8 @@ async function RunDatabaseUpdate()
         return
     }
     
-    let progressBarElement = semenDaemonContainerElement.querySelector("#dbScrapeUpdateProgressBar");
-    let updateButtonElement = semenDaemonContainerElement.querySelector("#dbScrapeUpdateProgressButton");    
+    let progressBarElement = SemenDaemonContainerElement.querySelector("#dbScrapeUpdateProgressBar");
+    let updateButtonElement = SemenDaemonContainerElement.querySelector("#dbScrapeUpdateProgressButton");    
     let latestDBEntryDate = videosList.reduce((latest, obj) => obj.created > latest ? obj.created : latest, new Date(0));
     let apiFetchErrors = []
     let totalPages = 0;
@@ -1638,6 +1707,8 @@ async function AutoDBUpdateTrigger()
 /*############### IWARA API #################*/
     class IwaraApi
     {
+        /** All functions fill send the request to the API and  */
+
         /**
          * Retrieve data from the iwara api for the given video catalog page
         * @param {int} page Page number (0 based index)
@@ -1646,7 +1717,7 @@ async function AutoDBUpdateTrigger()
             return fetch('https://api.iwara.tv/videos?sort=date&page=' + page, {
                 method: 'GET',
                 headers: {
-                    'Authorization': 'Bearer ' + apiAccessToken,
+                    'Authorization': 'Bearer ' + ApiAuthToken,
                     'Content-Type': 'application/json',
                 },
             })
@@ -1666,7 +1737,7 @@ async function AutoDBUpdateTrigger()
             return fetch('https://api.iwara.tv/video/' + videoId, {
                 method: 'GET',
                 headers: {
-                    'Authorization': 'Bearer ' + apiAccessToken,
+                    'Authorization': 'Bearer ' + ApiAuthToken,
                     'Content-Type': 'application/json',
                 },
             })
@@ -1689,7 +1760,7 @@ async function AutoDBUpdateTrigger()
             return fetch(videoPageData.fileUrl, {
                 method: 'GET',
                 headers: {
-                    'Authorization': 'Bearer ' + apiAccessToken,
+                    'Authorization': 'Bearer ' + ApiAuthToken,
                     'Content-Type': 'application/json',
                 },
             })
@@ -1700,7 +1771,254 @@ async function AutoDBUpdateTrigger()
                     return response.json(); // Parse JSON
                 });
         }
+
+        /**
+         * Use the stored iwara auth token to get a token for api access
+         */
+        static async GetAccessToken()
+        {
+            return fetch("https://api.iwara.tv/user/token", {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + ApiAuthToken,
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    
+                    return response.json(); // Parse JSON
+                })
+                    .then(parsedJson => {                        
+                            return parsedJson.accessToken
+                        });
+
+        }
+
+        /**
+         * Return list of videos the user has liked
+         * @param {int} page For which page to return the results
+         */
+        static async GetLikedVideos(page = 0)
+        {        
+            return fetch("https://api.iwara.tv/favorites/videos?page=" + page, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + ApiAccessToken,
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+    
+                    return response.json(); // Parse JSON
+                });
+        }
+
+        /**
+         * Get list of users who liked the video
+         * @param {string} videoId Id of the video
+         * @param {int} howMany How many likes to return, looks like api limit is 50 per request
+         * @returns 
+         */
+        static async GetVideoLikes(videoId, howMany = 6, page = 0) 
+        {
+            
+
+            return fetch("https://api.iwara.tv/video/" + videoId + "/likes?page=" + page + "&limit=" + howMany, {
+                method: 'GET',
+                headers: {
+                    //'Authorization': 'Bearer ' + ApiAccessToken,
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+    
+                    return response.json(); // Parse JSON
+                });
+        }
+
+        /**
+         * Fetch a list of users the given user is following
+         * @param {string} userId User id
+         * @param {int} page Which page of followed users to get
+         * @returns JS promise to resolve the json
+         */
+        static async GetFollowedUsers(userId, page = 0) 
+        {        
+            return fetch("https://api.iwara.tv/user/" + userId + "/following?page=" + page, {
+                method: 'GET',
+                headers: {
+                    //'Authorization': 'Bearer ' + ApiAccessToken,
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+    
+                    return response.json(); // Parse JSON
+                });
+        }        
     }
+
+    const ApiAccessToken = await IwaraApi.GetAccessToken();
+    
+    document.querySelector('#analyzeLikes').addEventListener('click', AnalyzeLikedVideos);
+
+    async function AnalyzeLikedVideos() 
+    {                
+        document.querySelector('#analyzeLikes').style.pointerEvents = 'none';
+        document.querySelector('#recAlgoProgressBar').style.display = 'grid';        
+
+        let progressBarCounterElements = [
+            document.querySelectorAll("#recAlgoProgressBar .value")[0],
+            document.querySelectorAll("#recAlgoProgressBar .value")[1],
+            document.querySelectorAll("#recAlgoProgressBar .value")[2],
+        ];
+
+        let recAlgoResultsElement = document.querySelector("#recAlgoResults");
+        let likedVideosList = [];
+
+        for (let i = 0; i < 10; i++) // Scan X pages of liked videos
+        {
+            let likedVideos = await IwaraApi.GetLikedVideos(i);            
+
+            if(!likedVideos || !likedVideos.results || likedVideos.results.length == 0)
+                break;
+
+            likedVideosList = likedVideosList.concat(likedVideos.results)   
+            progressBarCounterElements[0].innerHTML = i + ' (max 10)';
+        }
+
+        if(likedVideosList.length == 0)
+            return;
+
+        let likeUserList = [];
+        let usersProccessedCount = 0;
+        for (let i = 0; i < likedVideosList.length; i++)  // Go over the list of liked videos
+        {
+            const video = likedVideosList[i];
+            let videoId = video.video.id;          
+            
+            for (let y = 0; y < 10; y++) // Pull list of users who liked that video, several pages of likes
+            {                                    
+                let videoLikes = await IwaraApi.GetVideoLikes(videoId, 50, y);
+                
+                if(!videoLikes || !videoLikes.results || videoLikes.results.length == 0)
+                    break;
+
+                
+                videoLikes.results.forEach(like => // Add the users into a list and score them based how often they are in the likes
+                {                                                                           
+                    let existingUser = likeUserList.find(obj => obj.username == like.user.username);     
+                                                                
+                    if(like.user.username && like.user.username != UserName) // Make sure we don't add outselves to the list
+                    {
+                        if(existingUser)                                            
+                            existingUser.score += 1;                                                                                                
+                        else                  
+                        {
+                            like.user.score = 1;  
+                            likeUserList.push(like.user);                                          
+                        }
+
+                        progressBarCounterElements[1].innerHTML = ++usersProccessedCount;
+                    }   
+                    
+                })
+
+             }        
+             
+             //break; //debug only
+        }
+        
+        let recommendedArtistList = [];
+        let likeUserListSorted = likeUserList.sort((a, b) => b.score - a.score); // Sort by the same user count from high to low            
+        let likeUsersToProcess = likeUserListSorted.splice(0,30);
+        let artistsProccessedCount = 0;
+
+        for (let i = 0; i < likeUsersToProcess.length; i++)  // Loop over a chunk of the most likeminded users from the top of the list      
+        {            
+            if(likeUsersToProcess[i].score <= 1) // Users who didn't like at least 2 same videos as we aren't likely to have too likeminded interests
+                continue;
+
+            for (let y = 0; y < 30; y++)  // Fetch several pages of artists that user is following
+            {
+                
+                
+                let followedUsers = await IwaraApi.GetFollowedUsers(likeUsersToProcess[i].id, y);     
+                
+
+                if(!followedUsers || !followedUsers.results || followedUsers.results.length == 0)
+                    break;
+
+                
+                followedUsers.results.forEach(artist => // Put the artist in a list and score them, artists coming from users with higher score are also scored higher
+                    {                                                                           
+                        let existingUser = recommendedArtistList.find(obj => obj.username == artist.user.username);     
+                                                                    
+                        if(artist.user.username)
+                        {
+                            if(existingUser)                                            
+                                existingUser.score += likeUsersToProcess[i].score;                                                                                                
+                            else                  
+                            {
+                                artist.user.score = likeUsersToProcess[i].score;  
+                                recommendedArtistList.push(artist.user);                                          
+                            }
+
+                            progressBarCounterElements[2].innerHTML = ++artistsProccessedCount;
+                        }   
+                        
+                    })
+                
+                //break; // debug only
+            }                    
+
+            //break; // debug only
+        }
+
+        
+        recAlgoResultsElement.innerHTML = '';
+        
+        let recommendedArtistsSorted = recommendedArtistList.sort((a, b) => b.score - a.score); // Sort by the same user count from high to low            
+        recommendedArtistsSorted = recommendedArtistsSorted.splice(0,50);        
+
+        if(recommendedArtistsSorted.length <= 0)
+        {
+            recAlgoResultsElement.innerHTML = "<p>Sorry, looks like we don't have enough data to recommend any artists, you probably didn't like enough videos, or there weren't enough users found who like the same videos as you.</p>"
+            return;
+        }
+
+        let filterString = '';
+        recAlgoResultsElement.innerHTML += '<h3>Recomended artists</h3>'
+
+        recommendedArtistsSorted.forEach(artist => {
+            filterString += artist.username + ',';
+            recAlgoResultsElement.innerHTML += `<a href="https://www.iwara.tv/profile/${artist.username}" target="_blank">${artist.name} [${artist.score}]</a>, `;
+        })
+
+        recAlgoResultsElement.innerHTML += '<h3>Likeminded users</h3>'
+
+        likeUsersToProcess.forEach(user => {
+            recAlgoResultsElement.innerHTML += `<a href="https://www.iwara.tv/profile/${user.username}" target="_blank">${user.name} [${user.score}]</a>, `
+        })
+        
+        recAlgoResultsElement.innerHTML += '<h3>Above artist list, formatted for use in search</h3>';
+        recAlgoResultsElement.innerHTML += '<input type="text" value="u:' + filterString + '">';        
+    }
+
+    //AnalyzeLikedVideos();
+
 
     /**
      * Turn string into a file which is then offered to the user for download under the specified filename
@@ -1737,7 +2055,7 @@ async function AutoDBUpdateTrigger()
         blacklistElement.value = Config.data.blacklist;
         
         if(Config.data.showIntroduction) // If this is the first time using this addon, show the introduction
-            semenDaemonContainerElement.querySelector('#introductionContainer').style.display = 'block';
+            SemenDaemonContainerElement.querySelector('#introductionContainer').style.display = 'block';
                 
         
         
