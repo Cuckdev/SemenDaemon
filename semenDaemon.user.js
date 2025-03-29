@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SemenDaemon
 // @namespace    cuckIndustries
-// @version      v1.3
+// @version      v1.31
 // @description  Video search tool for iwara.tv
 // @author       Cuckdev
 // @match        https://www.iwara.tv/*
@@ -15,10 +15,10 @@
 // For DEV loader script method, since GM object is not available in the injected script
 if(!GM)
 {
-    var GM = {'info': {'script': {'version': 1.3}}}
+    var GM = {'info': {'script': {'version': 1.31}}}
 }
 
-(async function() {
+(function() {
     'use strict';
     var videosList = []    
     const MaxSearchResults = 1000;
@@ -1704,6 +1704,8 @@ async function AutoDBUpdateTrigger()
         }
     }
 
+var ApiAccessToken = '';
+
 /*############### IWARA API #################*/
     class IwaraApi
     {
@@ -1869,8 +1871,6 @@ async function AutoDBUpdateTrigger()
                 });
         }        
     }
-
-    const ApiAccessToken = await IwaraApi.GetAccessToken();
     
     document.querySelector('#analyzeLikes').addEventListener('click', AnalyzeLikedVideos);
 
@@ -2057,7 +2057,8 @@ async function AutoDBUpdateTrigger()
         if(Config.data.showIntroduction) // If this is the first time using this addon, show the introduction
             SemenDaemonContainerElement.querySelector('#introductionContainer').style.display = 'block';
                 
-        
+
+        ApiAccessToken = await IwaraApi.GetAccessToken();        
         
     })();
     
