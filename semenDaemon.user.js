@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SemenDaemon
 // @namespace    cuckIndustries
-// @version      v1.31
+// @version      v1.4
 // @description  Video search tool for iwara.tv
 // @author       Cuckdev
 // @match        https://www.iwara.tv/*
@@ -15,7 +15,7 @@
 // For DEV loader script method, since GM object is not available in the injected script
 if(!GM)
 {
-    var GM = {'info': {'script': {'version': 1.31}}}
+    var GM = {'info': {'script': {'version': 1.4}}}
 }
 
 (function() {
@@ -509,6 +509,7 @@ if(!GM)
 
         /* WINDOW STYLES */
 
+
             #semenDaemonContainer .semenDaemonPage
             {
                 position: absolute;
@@ -627,6 +628,13 @@ if(!GM)
             {
                 background-color: #206bd2;
             }
+
+            #semenDaemonContainer span.hint
+            {
+                border: 2px dotted white;
+                border-width: 0 0 2px 0;
+                cursor: help;
+            }
         </style>
         `;
 
@@ -665,10 +673,11 @@ if(!GM)
     SemenDaemonContainerElement.innerHTML += /*html*/`  
     <div id="changelogContainer" class="semenDaemonPage">
         <div class="closePage">❌</div>
-        <h2 style="margin: 0px 0 10px 0">Changelog v1.3</h2>        
+        <h2 style="margin: 0px 0 10px 0">Changelog v1.4</h2>        
         <p><ul>
-            <li>Added artist finder tool, which recommends you artists based on artists that people whole liked the same videos as you follow. You can access it by clicking the 🫅 icon under the search bar.</li>
-            <li>Search bar is now sticky, as you scroll down it will stay visible.</li>
+            <li>Added new slop filter <i>slop:gapDays:maxSlopShare</i> - Read about how it works on the filter FAQ page</li>
+            <li>Added new ratio sorting option <i>sort:ratio</i>, which uses the  Wilson lower bound + a small reach bonus relationship between likes and views to sort the videos. </li>
+            <li>Added new <i>vid:videoId,video2Id...</i> filter option to find videos by their ID</li>
         </ul></p>
     </div>
     `;
@@ -818,12 +827,14 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
             <li><i><span class="argName">user-:</span>user1,user_2</i> - Uploader/user/artist name must match NONE of these (can be shortened to u-:user1)</li>
             <li><i><span class="argName">character:</span>character1,character_2</i> - Listed characters must match ONE of these. (can be shortened to c:character)</li>
             <li><i><span class="argName">character&:</span>character1,character_2</i> - All listed characters must be present in character tags (can be shortened to c&:character)</li>
-            <li><i><span class="argName">sort:</span>views | likes | artist | date | duration | comments</i> - Sort the results by one of these</li>
-            <li><i><span class="argName">sort<:</span>views | likes | artist | date | duration | comments</i> - Sort the results by one of these in asceding order</li>
+            <li><i><span class="argName">sort:</span>views | likes | <span class="hint" title="Uses Wilson lower bound + a small reach bonus relatioship between likes and views, with videos that have low likes and views beieng treated as lower priority">ratio</span> | artist | date | duration | comments</i> - Sort the results by one of these</li>
+            <li><i><span class="argName">sort<:</span>views | likes | ratio | artist | date | duration | comments</i> - Sort the results by one of these in asceding order</li>
             <li><i><span class="argName">s:</span>v | l | a | d | u | c</i> - Same as above, but shorter to write</li>
             <li><i><span class="argName">likes | views | duration ></span>NUBMER</i> - Must have more than given amount of likes, views, or be longer than given amount of seconds (you can also use less than <)</li>
             <li><i><span class="argName">l | v | d ></span>NUMBER</i> - Same as above, but shorter to write</li>
+            <li><i><span class="argName hint" title="Can also use sl: for short">slop:</span><span class="hint" title="Videos uploaded by an uploader fewer days apart than this number, count towards that uploader's slop score ">gapDays</span>:<span class="hint" title="0-100 range (%), 40 means that if more than 40% of that uploader's videos are slop, all his videos are removed from search results.">maxSlopShare</span></i> - Filters out all videos from uploaders whose content contains more slop than specified. Read more about how this works below.</li>
             <li><i><span class="argName">oreno:</span>off</i> - Do not use oreno common tag library during tag searches</li>
+            <li><i><span class="argName">vid:</span>videoId1,videoId2,videoId3</i> - Only display videos matching one of these IDs</li>
             <li><i>search query 1 <span class="argName">||</span> search query 2</i> - Combine results from seveal search queries</li>
         </ul>
         <p>You can combine these filters in any way you like.<br> Searches are case insensitive.<br> Filters cannot have spaces in them, you can write "artist name" as "artist_name".<br>You cannot use same type of filter more than once, for example +tag1,tag2 +tag3,tag4.</p>
@@ -846,6 +857,11 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
 
         <p><b>+strip,dance +mmd likes>200 || hmv -koikatsu views>10000 sort:views</b><br>
         <i>Runs first query at the left side of ||, then the second query at the right side, then combines both result pools and sorts them. You can have as many || (aka OR) segments as you want. Important: Sorting is applied for the entire query, not per segment, this means that only one sort:.. notation can be used for the whole query.</i></p>
+
+        <p><b>slop:10:50</b><br>
+        <i>Filter out ALL videos from artists whose content is more than 50% slop uploads. Let's say  artist  uploaded 100 videos total, 40 of those he uploaded at a rate of one video every 5 to 9 days, remaining 60 he uploaded a rate of 1 every 30 days. If gapDays is set to 10, then any two videos uploaded less than 10 days apart are considerd slop. This means 40% of this uploader's content is considered slop. Please note that this operation is CPU intensive and if you run it by itself, it will have to crunch through ALL videos in the database and based on your CPU speed, that could take several minutes (on a fast PC it's usually about sub 1 minute). However, if you use it alongside other filter options, where it has to work with say only 1000 results total, it will be nearly instant.
+            <br>The theory behind this is simple: Good videos take a long time to make, so if videos are made and uploaded at a quick rate by a single person, they are very likely low quality.
+        </i></p>
 
     </div>
     `;
@@ -962,7 +978,9 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
 
         queryFieldElement.value = Config.data.lastSearchedQuery ?? "";
     })
-            
+     
+    
+    
 /*############### SEARCH INPUT AND FILTERING #################*/
     // Makes callable function on strings via stringvar.adjustForFiltering() and preps the string to be used for filter comparison
     String.prototype.adjustForFiltering = function ()
@@ -970,6 +988,53 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
         return this.toLowerCase().replaceAll(' ', '_'); 
     };
 
+    // Used for determining how much of the uploader's content is potentially hastily produced slop 
+    function ComputeUploaderSlopScores(filteredVideosList, gapDays, ignoreOld = 0) 
+    {
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+        const gapMs = gapDays * MS_PER_DAY;
+
+        // Group timestamps by uploader
+        const byUploader = Object.create(null);
+        for (const v of filteredVideosList) {
+            const uploader = String(v.uploader ?? '');
+            if (!byUploader[uploader]) byUploader[uploader] = [];
+            const t = v.created instanceof Date
+            ? v.created.getTime()
+            : new Date(v.created).getTime();
+            byUploader[uploader].push(t);
+        }
+
+        const result = [];
+
+        for (const [uploader, times] of Object.entries(byUploader)) {
+            // Sort oldest → newest
+            times.sort((a, b) => a - b);
+
+            // Drop the oldest `ignoreOld` videos
+            const usableTimes = ignoreOld > 0 ? times.slice(ignoreOld) : times;
+            const totalVideos = usableTimes.length;
+
+            // Not enough videos left to compare
+            if (totalVideos < 2) {
+            result.push({ uploader, score: 0, totalVideos });
+            continue;
+            }
+
+            let score = 0;
+
+            // Check nearest neighbors only
+            for (let i = 0; i < totalVideos; i++) {
+            const leftClose  = i > 0 && (usableTimes[i] - usableTimes[i - 1] < gapMs);
+            const rightClose = i < totalVideos - 1 && (usableTimes[i + 1] - usableTimes[i] < gapMs);
+            if (leftClose || rightClose) score++;
+            }
+
+            result.push({ uploader, score, totalVideos });
+        }
+
+        return result;
+    }
 
     queryFieldElement.placeholder = searchQueryPlaceholders[Math.floor(Math.random()*searchQueryPlaceholders.length)];    
     queryFieldElement.addEventListener('keydown', (e) => {
@@ -997,20 +1062,25 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
             queryText = queryText.replaceAll(sorting[0], '');          
 
         let orSegments = queryText.split('||');
-        let filteredVideosListCombined = [];             
+        let filteredVideosListCombined = [];   
+            
         
         // Run filtering on each segment and then join the results at the end, which will give us the OR filtering
         orSegments.forEach(queryText => 
         {                          
             let filteredVideosList = [];      
             let likesFilter = queryText.match(/l(?:ikes)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
-            let viewsFilter = queryText.match(/v(?:iews)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
+            let viewsFilter = queryText.match(/v(?:iews)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);            
             let durationFilter = queryText.match(/d(?:uration)?(?<operator>[<>=]{1,2})(?<amount>[0-9]{1,9})/ui);
             let usersFilter = queryText.match(/u(?:ser)?(?<blacklist>-)?:(?<userList>[^\s]+)/ui);
             let charactersFilter = queryText.match(/c(?:haracter)?(?<all>&)?:(?<characterList>[^\s]+)/ui);
+            let videoIdFilter = queryText.match(/vid:(?<videoIds>[A-Z0-9,]{5,})/ui);
+            let slopFilter = queryText.match(/sl(?:op)?:(?<gapDays>[0-9]{1,9})(?::(?<slopShare>[0-9]{1,9}))?/ui);
             let tagsFilterWhite = queryText.match(/\+(?<all>&)?(?<tagList>[^\s]+)/ui);
             let tagsFilterBlack = queryText.match(/-(?<all>&)?(?<tagList>[^\s]+)/ui); // \p{L} natch all unicode letters             
             let orenoTagsSwitch = queryText.match(/oreno:(?<state>on|off)/ui);
+            
+            
 
             let tagCategoriesToUse = (orenoTagsSwitch?.groups.state == 'off') ? TagCategories.IwaraGeneral : TagCategories.All;
 
@@ -1074,6 +1144,9 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
                         }
                     }); 
             }
+
+            
+
 
             if(durationFilter)
                 {
@@ -1201,6 +1274,43 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
                 );
             }
 
+            if(videoIdFilter) // VideoID must match
+            {            
+                queryText = queryText.replaceAll(videoIdFilter[0], '');
+                let videoIdList = videoIdFilter.groups.videoIds.split(',');                 
+                filteredVideosList = filteredVideosList.filter(videoData => 
+                    
+                    videoIdList.some(videoId => 
+                        videoData.videoId == videoId
+                        
+                    )
+                );
+            }
+
+            if(slopFilter) // Slop Filter videos by upload gaps per uploader
+            {            
+                queryText = queryText.replaceAll(slopFilter[0], '');
+                let slopGapDays = parseInt(slopFilter.groups.gapDays);
+                let maxSlopShare = parseInt(slopFilter.groups.slopShare);                
+                maxSlopShare = (!Number.isNaN(maxSlopShare) ? maxSlopShare : 50);
+                let slopChart = ComputeUploaderSlopScores(filteredVideosList, slopGapDays, 0);
+                let slopChartFiltered =  slopChart.filter((uploader) => ((100.0/uploader.totalVideos) * uploader.score) > maxSlopShare)    
+
+                slopChart.forEach(uploader => {
+                    console.log(((100.0/uploader.totalVideos) * uploader.score) < maxSlopShare)
+                })
+
+                filteredVideosList = filteredVideosList.filter(videoData => 
+                    !slopChartFiltered.some(uploaderStats => 
+                        uploaderStats.uploader.adjustForFiltering() == videoData.uploader.adjustForFiltering()
+                    )
+                );
+
+                console.log(maxSlopShare)
+                console.log(slopChartFiltered)
+                
+            }
+                console.log(filteredVideosList)
             // Global tag blacklist from settings page
             if(blacklistElement && blacklistElement.value) 
             {            
@@ -1229,14 +1339,17 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
             filteredVideosListCombined = filteredVideosListCombined.concat(filteredVideosList)
         })   
     
+        // ############## SORTING ################
         if(sorting)
         {    
             let sortAscending = sorting.groups?.ascending  ? true : false;            
-            const sortingFields = {
+            const sortingFields = {                
                 v: "views",
                 views: "views",
                 l: "likes",
                 likes: "likes",
+                r: "ratio",
+                ratio: "ratio",
                 a: "uploaderDisplayName",
                 artist: "uploaderDisplayName",
                 d: "created",
@@ -1265,7 +1378,40 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
                         filteredVideosListCombined.sort((a, b) => a[sortBy].localeCompare(b[sortBy]));
                     else
                         filteredVideosListCombined.sort((a, b) => b[sortBy].localeCompare(a[sortBy]));
-                    break;                
+                    break;            
+                case 'ratio':
+                    // Configuration: tweak alpha to control how much views matter (0 = pure Wilson)
+                    const Z = 1.96;     // 95% confidence
+                    const ALPHA = 0.3;  // reach bonus strength (0.0..1.0 typical)
+
+                    // Wilson lower bound for a binomial proportion
+                    function wilsonLowerBound(likes, views, z = Z) {
+                    if (!views || views <= 0) return 0;
+                    const p = likes / views;
+                    const z2 = z * z;
+                    const denom = 1 + z2 / views;
+                    const centre = p + z2 / (2 * views);
+                    const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * views)) / views);
+                    return Math.max(0, (centre - margin) / denom);
+                    }
+
+                    // Composite score: conservative quality (Wilson) boosted slightly by reach (log10(views))
+                    function videoScore(v) {
+                    const likes = Number(v.likes) || 0;
+                    const views = Number(v.views) || 0;
+                    const w = wilsonLowerBound(likes, views);
+                    const reachBonus = 1 + ALPHA * (Math.log10 ? Math.log10(views + 1) : Math.log(views + 1) / Math.LN10);
+                    return w * reachBonus;
+                    }
+
+                    // Sort videos descending by composite score
+                    if(!sortAscending)
+                        filteredVideosListCombined.sort((a, b) =>  videoScore(b) - videoScore(a));
+                    else
+                        filteredVideosListCombined.sort((a, b) =>  videoScore(a) - videoScore(b));
+
+                    break;
+
                 case 'created':                  
                 default: // Here 'created' is hardcoded, since if default is triggered it's using some unknown string for sorting so we default to created
                     if(!sortAscending)                    
