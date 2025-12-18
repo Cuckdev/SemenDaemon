@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SemenDaemon
 // @namespace    cuckIndustries
-// @version      v1.4
+// @version      v1.40
 // @description  Video search tool for iwara.tv
 // @author       Cuckdev
 // @match        https://www.iwara.tv/*
@@ -15,7 +15,7 @@
 // For DEV loader script method, since GM object is not available in the injected script
 if(!GM)
 {
-    var GM = {'info': {'script': {'version': 1.4}}}
+    var GM = {'info': {'script': {'version': 1.40}}}
 }
 
 (function() {
@@ -829,7 +829,7 @@ SemenDaemonContainerElement.innerHTML += /*html*/`
             <li><i><span class="argName">character&:</span>character1,character_2</i> - All listed characters must be present in character tags (can be shortened to c&:character)</li>
             <li><i><span class="argName">sort:</span>views | likes | <span class="hint" title="Uses Wilson lower bound + a small reach bonus relatioship between likes and views, with videos that have low likes and views beieng treated as lower priority">ratio</span> | artist | date | duration | comments</i> - Sort the results by one of these</li>
             <li><i><span class="argName">sort<:</span>views | likes | ratio | artist | date | duration | comments</i> - Sort the results by one of these in asceding order</li>
-            <li><i><span class="argName">s:</span>v | l | a | d | u | c</i> - Same as above, but shorter to write</li>
+            <li><i><span class="argName">s:</span>v | l | r | a | d | u | c</i> - Same as above, but shorter to write</li>
             <li><i><span class="argName">likes | views | duration ></span>NUBMER</i> - Must have more than given amount of likes, views, or be longer than given amount of seconds (you can also use less than <)</li>
             <li><i><span class="argName">l | v | d ></span>NUMBER</i> - Same as above, but shorter to write</li>
             <li><i><span class="argName hint" title="Can also use sl: for short">slop:</span><span class="hint" title="Videos uploaded by an uploader fewer days apart than this number, count towards that uploader's slop score ">gapDays</span>:<span class="hint" title="0-100 range (%), 40 means that if more than 40% of that uploader's videos are slop, all his videos are removed from search results.">maxSlopShare</span></i> - Filters out all videos from uploaders whose content contains more slop than specified. Read more about how this works below.</li>
