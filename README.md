@@ -24,7 +24,12 @@ There are some tradeoffs in exchange for the speed you will be getting. Due to t
 It's very simple, download the SemenDeamon .js file and install it with your userscript manager of choice, I use Violentmonkey for example. After that go to Iwara, open SemenDaemon, read the Introduction page it shows you and import the database file, which you can also download from a link below. Don't forget to unzip it first.
 <br>
 <a href="https://raw.githubusercontent.com/Cuckdev/SemenDaemon/refs/heads/main/semenDaemon.user.js">Direct install link</a>
-<br><br>Database file download links (2025-01-11) (file is too big to fit on github)<br>
+
+<br>Database file download links (2025-12-29) (file is too big to fit on github)<br>
+https://files.catbox.moe/xb2qva.zip<br>
+https://mega.nz/file/FpwDWaBC#s-S8VwxLALVDfY2HTaVsT7N5EVG54uROmtXubLFlA5Y
+
+<br>[OLD] Database file download links (2025-01-11) (file is too big to fit on github)<br>
 https://files.catbox.moe/woc1sl.zip<br>
 https://mega.nz/file/A04zzYaT#lVA5yRX3Q88HKMd7FhlB6wLnknzdpC148oOm1c1lbIQ
 
